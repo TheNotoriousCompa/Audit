@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",                    // ❗️Forza CommonJS
+    "moduleResolution": "node",              // ❗️Usa "node"
+    "rootDir": "src/main",                   // ❗️Corretto: src/main
+    "outDir": "dist/main",                   // ❗️Corretto: dist/main
+    "noEmit": false,
+    "sourceMap": true,
+    "declaration": false,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "types": ["node", "electron"],
+    "lib": ["ES2022", "DOM"],
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": false
+  },
+  "include": ["src/main/preload.ts"],
+  "exclude": ["node_modules", "dist"]        // ❗️Rimosso src/main
+}
