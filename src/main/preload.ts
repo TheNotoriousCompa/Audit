@@ -1,11 +1,25 @@
+// preload.ts
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-import type { DownloadProgress, DownloadOptions } from '../types/electron.js';
+// Importa i tipi dal file centrale
+import type { DownloadProgress, DownloadOptions, DownloadResult, ElectronAPI } from '../types/electron.d.ts';
 
-// Log that preload script is running
+// Log che preload script è caricato
 console.log('Preload script loaded');
 
-// Expose protected methods to the renderer
-const electronAPI = {
+// Implementazione dell'API
+const electronAPI: ElectronAPI = {
+  windowMinimize: () => {
+    console.log('windowMinimize called');
+    ipcRenderer.send('window:minimize');
+  },
+  windowMaximize: () => {
+    console.log('windowMaximize called');
+    ipcRenderer.send('window:maximize');
+  },
+  windowClose: () => {
+    console.log('windowClose called');
+    ipcRenderer.send('window:close');
+  },
   selectFolder: (): Promise<string> => {
     console.log('selectFolder called from renderer');
     return ipcRenderer.invoke('dialog:openFolder').catch((error: Error) => {
@@ -13,41 +27,22 @@ const electronAPI = {
       throw error;
     });
   },
-
-  // Nuove funzioni per i controlli finestra
-  windowMinimize: (): void => {
-    console.log('windowMinimize called');
-    ipcRenderer.send('window:minimize');
-  },
-  windowMaximize: (): void => {
-    console.log('windowMaximize called');
-    ipcRenderer.send('window:maximize');
-  },
-  windowClose: (): void => {
-    console.log('windowClose called');
-    ipcRenderer.send('window:close');
-  },
-
-  onDownloadProgress: (callback: (progress: DownloadProgress) => void): ((event: IpcRendererEvent, progress: DownloadProgress) => void) => {
-    const listener = (_event: IpcRendererEvent, progress: DownloadProgress) => {
-      callback(progress);
-    };
-    ipcRenderer.on('download-progress', listener);
-    return listener;
-  },
-  removeProgressListener: (listener: (event: IpcRendererEvent, progress: DownloadProgress) => void): void => {
-    ipcRenderer.removeListener('download-progress', listener);
-  },
-  downloadYoutube: (url: string, options: DownloadOptions): Promise<{ output: string }> => {
+  downloadYoutube: (url: string, options: DownloadOptions): Promise<DownloadResult> => {
     return ipcRenderer.invoke('download:youtube', { url, options });
   },
-  // Funzione per la conversione YouTube
-  convertYoutube: (query: string): Promise<string> => {
-    return ipcRenderer.invoke('convert-youtube', query);
+  onDownloadProgress: (callback: (event: IpcRendererEvent, progress: DownloadProgress) => void): void => {
+    ipcRenderer.on('download-progress', callback);
+  },
+  removeProgressListener: (callback: (event: IpcRendererEvent, progress: DownloadProgress) => void): void => {
+    ipcRenderer.removeListener('download-progress', callback);
+  },
+  convertYoutube: (query: string, options: DownloadOptions = {}) => {
+    console.log('convertYoutube called with query:', query, 'and options:', options);
+    return ipcRenderer.invoke('convert-youtube', query, options);
   }
 };
 
-// Expose the API to the renderer process
+// Esporre l'API al processo renderer
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
 
 console.log('Electron API exposed to renderer');

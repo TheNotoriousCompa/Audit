@@ -1,26 +1,19 @@
-import webpack from 'webpack';
-import type { Configuration as WebpackConfig } from 'webpack';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
+const webpack = require('webpack');
+const path = require('path');
 
-interface WebpackOptions {
-  isServer: boolean;
-  dev: boolean;
-  defaultLoaders: Record<string, unknown>;
-}
-
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   // Disable static export in Electron, enable for web
   output: process.env.ELECTRON === 'true' ? undefined : 'export',
   images: { unoptimized: true },
   reactStrictMode: false,
 
-  webpack: (config: WebpackConfig, { isServer, dev }: WebpackOptions): WebpackConfig => {
-    // Inizializza plugin e risoluzioni
+  webpack: (config, { isServer, dev }) => {
+    // Initialize plugins and resolutions
     config.plugins = config.plugins || [];
     config.resolve = config.resolve || {};
 
-    // Definizione variabili d'ambiente
+    // Define environment variables
     config.plugins.push(
       new webpack.DefinePlugin({
         'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
@@ -29,7 +22,7 @@ const nextConfig = {
       })
     );
 
-    // Aggiunge i fallback per le API Node nel renderer
+    // Add Node.js API fallbacks for the renderer
     if (!isServer) {
       config.resolve.fallback = {
         ...(config.resolve.fallback || {}),
@@ -46,7 +39,7 @@ const nextConfig = {
       };
     }
 
-    // Source map leggibili in dev
+    // Source maps for development
     if (dev) {
       config.devtool = 'eval-source-map';
     }
@@ -55,4 +48,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

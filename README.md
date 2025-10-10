@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# YouTube to MP3 Converter
 
-## Getting Started
+A lightweight desktop application that lets you download high-quality MP3 audio from YouTube videos. Built with Electron, React, and TypeScript, with yt-dlp for reliable YouTube downloads.
 
-First, run the development server:
+## Features
+
+- Download YouTube videos as high-quality MP3 files
+- Simple and intuitive user interface
+- Fast downloads with progress tracking
+- Cross-platform support (Windows, macOS, Linux)
+- No file size limits
+
+## Prerequisites
+
+- Node.js 16.x or later
+- npm or yarn
+- Python 3.7+ (for yt-dlp)
+- FFmpeg (for audio conversion)
+
+## Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/TheNotoriousCompa/ytmp3-next.git
+   cd ytmp3-next
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn
+   ```
+
+3. Install Python dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Usage
+
+1. Start the application:
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+2. Copy and paste a YouTube URL into the input field
+3. Click "Download" and choose a save location
+4. Wait for the conversion to complete
+
+## Building for Production
+
+To create a standalone application:
 
 ```bash
-npm run dev
+# Build the application
+npm run build
 # or
-yarn dev
+yarn build
+
+# Package for your platform
+npm run package
 # or
-pnpm dev
-# or
-bun dev
+yarn package
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Project Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+ytmp3-next/
+├── src/                    # Source files
+│   ├── main/               # Electron main process
+│   ├── renderer/           # React frontend
+│   └── types/              # TypeScript definitions
+├── python/                 # yt-dlp wrapper and FFmpeg
+└── scripts/                # Build utilities
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## License
 
-## Learn More
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-To learn more about Next.js, take a look at the following resources:
+## Disclaimer
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This application is for personal use only. Please respect YouTube's terms of service and only download content you have the rights to.

@@ -42,13 +42,11 @@ def find_ffmpeg() -> Optional[str]:
             paths = result.stdout.strip().split('\n')
             for path in paths:
                 if path.strip().endswith('ffmpeg.exe') and os.path.exists(path.strip()):
-                    logging.info(f"Found FFmpeg in PATH: {path.strip()}")
                     return path.strip()
         else:
             result = subprocess.run(['which', 'ffmpeg'], capture_output=True, text=True, check=True)
             path = result.stdout.strip()
             if path and os.path.exists(path):
-                logging.info(f"Found FFmpeg in PATH: {path}")
                 return path
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
@@ -66,27 +64,21 @@ def find_ffmpeg() -> Optional[str]:
         
         for path in common_paths:
             if os.path.exists(path):
-                logging.info(f"Found FFmpeg at: {path}")
                 return path
-    
     # 3. Try to find ffmpeg in the current directory
     if os.path.exists('ffmpeg.exe'):
-        logging.info("Found ffmpeg.exe in current directory")
         return os.path.abspath('ffmpeg.exe')
     
     # 4. Try to find ffmpeg in a local ffmpeg directory
     local_ffmpeg = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg', 'bin', 'ffmpeg.exe')
     if os.path.exists(local_ffmpeg):
-        logging.info(f"Found FFmpeg in local directory: {local_ffmpeg}")
         return local_ffmpeg
     
     # 5. Try to find ffmpeg in the same folder as this script (python folder)
     script_dir_ffmpeg = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg.exe')
     if os.path.exists(script_dir_ffmpeg):
-        logging.info(f"Found FFmpeg in script directory: {script_dir_ffmpeg}")
         return script_dir_ffmpeg
     
-    logging.warning("FFmpeg not found in any standard locations")
     return None
 
 # Windows-specific fixes
@@ -456,11 +448,10 @@ def download_audio(url: str, output_path: Path, bitrate: int = 320, timeout: int
     last_error = None
     
     for client in clients:
-        if progress_callback:
-            progress_callback({'status': 'downloading', 'message': f'Trying {client} client...'})
-        logger.info(f"Trying download with {client} client")
-        
         try:
+            if progress_callback:
+                progress_callback({'status': 'downloading'})
+                
             return _download_with_client(
                 url=url,
                 output_path=output_path,
@@ -473,13 +464,12 @@ def download_audio(url: str, output_path: Path, bitrate: int = 320, timeout: int
             )
         except Exception as e:
             last_error = str(e)
-            logger.warning(f"Failed with {client} client: {last_error}")
             if 'This video is not available' in str(e):
                 continue  # Try next client
             if 'Private video' in str(e) or 'members-only' in str(e).lower():
                 break  # No point trying other clients for these errors
     
-    error_msg = f"All client attempts failed. Last error: {last_error}"
+    error_msg = f"Download failed: {last_error}"
     logger.error(error_msg)
     if progress_callback:
         progress_callback({'status': 'error', 'message': error_msg})
@@ -789,7 +779,7 @@ def _download_with_client(url: str, output_path: Path, bitrate: int, timeout: in
             logger.info(f"Download attempt {attempt}/{max_retries}: {video_title}")
             
             # Configure download options for this attempt
-            ydl_opts = get_ydl_opts(safe_title, bitrate, progress_callback, client, process_playlist)
+            ydl_opts = get_ydl_opts(safe_title, bitrate, output_path, progress_callback, client, process_playlist)
             
             # Perform download
             success, result = simple_download(ydl_opts, url)
@@ -869,90 +859,51 @@ def process_single_url(url: str, output_dir: Path, bitrate: int = 320,
     Process a single YouTube URL or search query to download and convert to MP3.
     Accepts direct URLs or ytsearch1: queries.
     """
-    start_time = time.time()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Handle search queries (ytsearch1: prefix)
+    if url.startswith('ytsearch1:'):
+        return search_youtube_and_download(
+            query=url[10:],
+            output_dir=output_dir,
+            bitrate=bitrate,
+            timeout=timeout,
+            progress_callback=progress_callback
+        )
+    
+    # Handle direct URLs
     try:
-        raw_input = url.strip()
-        # If input starts with ytsearch, treat as search query
-        if raw_input.startswith('ytsearch'):
-            url = raw_input
-        # If input looks like a URL, use as is
-        elif raw_input.startswith(('http://', 'https://')):
-            url = raw_input
-        else:
-            # Try to extract a valid URL from the input
-            normalized = extract_valid_url(raw_input)
-            if not normalized:
-                print("No valid URL found in input.")
-                raise ValueError("No valid URL found in input")
-            url = normalized
-
-        # Clean the URL and check for playlist/mix params (only for real URLs)
-        if url.startswith(('http://', 'https://')):
-            cleaned_url = clean_youtube_url(url)
-            if any(param in cleaned_url for param in ['list=', 'start_radio=', 'index=', 'playnext=']):
-                print("Playlist or mix URLs are not supported in single conversion mode. Please provide a direct video link.")
-                logging.error("Playlist or mix URL detected after cleaning. Aborting.")
-                return False, None
-            url = cleaned_url
-
-        # For real URLs, check domain
-        if url.startswith(('http://', 'https://')):
-            parsed = urlparse(url)
-            if not parsed.scheme or not parsed.netloc:
-                print("Invalid URL format.")
-                raise ValueError("Invalid URL format")
-            if 'youtube.com' not in parsed.netloc and 'youtu.be' not in parsed.netloc:
-                print("Only YouTube URLs are supported.")
-                raise ValueError("Only YouTube URLs are supported")
-        output_dir.mkdir(parents=True, exist_ok=True)
-
+        # Clean the URL
+        clean_url = clean_youtube_url(url)
+        
         # Check if file already exists
-        print("Extracting video info...")
-        info_result = [None]
-        info_exception = [None]
-        def info_thread():
-            try:
-                with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-                    info_result[0] = ydl.extract_info(url, download=False)
-            except Exception as e:
-                info_exception[0] = e
-        t = threading.Thread(target=info_thread)
-        t.start()
-        t.join(timeout=20)  # 20 second timeout for info extraction
-        if t.is_alive():
-            print("Timed out while extracting video info. The link may be a playlist/mix or YouTube is slow.")
-            logging.error("Timeout during info extraction.")
-            return False, None
-        if info_exception[0]:
-            print(f"Error extracting video info: {info_exception[0]}")
-            logging.error(f"URL check failed: {info_exception[0]}")
-            return False, None
-        info = info_result[0]
-        print("Video info extracted.")
-        if not info:
-            print("Could not get video information.")
-            raise ValueError("Could not get video information")
-        # If a playlist URL was passed, reject with a helpful message
-        if info.get('_type') == 'playlist':
-            print("Playlist URLs are not supported in single conversion. Use batch mode.")
-            raise ValueError("Playlist URLs are not supported in single conversion. Use batch mode.")
-        video_title = info.get('title', 'Unknown_Video')
-        safe_title = sanitize_filename(video_title)
-        output_file = output_dir / f"{safe_title}.mp3"
-        if skip_existing and output_file.exists():
-            file_size = output_file.stat().st_size
-            if file_size > 100 * 1024:  # At least 100KB
+        with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
+            info = ydl.extract_info(clean_url, download=False)
+            if not info:
+                raise Exception("Could not extract video info")
+                
+            title = info.get('title', 'Unknown Title')
+            output_file = output_dir / f"{sanitize_filename(title)}.mp3"
+            
+            if skip_existing and output_file.exists():
                 if progress_callback:
                     progress_callback({
                         'status': 'skipped',
-                        'output_file': str(output_file),
-                        'reason': 'File already exists'
+                        'message': f'File already exists: {output_file.name}'
                     })
-                print(f"File already exists: {output_file}")
-                return True, output_file
+                return True, str(output_file)
+
+        # Download the audio
+        result = download_audio(
+            url=clean_url,
+            output_path=output_dir,
+            bitrate=bitrate,
+            timeout=timeout,
+            progress_callback=progress_callback
+        )
         
-        # Now proceed with download
-        result = download_audio(url, output_dir, bitrate, timeout=timeout, progress_callback=progress_callback)
+        # Verify download result
         if not result or result == (None, None):
             logging.error("Download failed - No file was created")
             return False, None
@@ -990,12 +941,15 @@ def process_single_url(url: str, output_dir: Path, bitrate: int = 320,
         
         # Success!
         elapsed = time.time() - start_time
-        logging.info(f"Successfully downloaded: {video_title or 'Unknown Title'}")
         logging.info(f"Saved to: {downloaded_file}")
-        logging.info(f"File size: {file_size / (1024*1024):.2f} MB")
-        logging.info(f"Time taken: {elapsed:.1f} seconds")
+        if progress_callback:
+            progress_callback({
+                'status': 'finished',
+                'output_file': str(downloaded_file),
+                'elapsed': f"{elapsed:.1f}s"
+            })
         
-        return True, downloaded_file
+        return True, str(downloaded_file)
         
     except Exception as e:
         error_msg = f"Error processing URL {url}: {str(e)}"
@@ -1067,23 +1021,26 @@ if __name__ == "__main__":
     output_dir = Path(args.output_folder)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    setup_logging()
-    ffmpeg_path = find_ffmpeg()
-    print(f"FFmpeg detected at: {ffmpeg_path if ffmpeg_path else 'NOT FOUND'}")
+    # Set up logging with minimal console output
+    logging.basicConfig(level=logging.ERROR, format='%(message)s')
+    logger = logging.getLogger()
+    
+    # Only show errors in console
+    for handler in logger.handlers[:]:
+        if isinstance(handler, logging.StreamHandler):
+            handler.setLevel(logging.ERROR)
 
     if args.batch:
-        print(f"Batch downloading from: {args.batch}\nOutput folder: {output_dir}")
         results = batch_download_from_file(args.batch, output_dir, bitrate=args.bitrate)
         for query, success, output in results:
             status = "✓" if success else "✗"
             print(f"{status} {query} -> {output}")
-        print("Batch download complete.")
     elif args.url:
-        print(f"Downloading: {args.url}\nOutput folder: {output_dir}")
         success, output_file = process_single_url(args.url, output_dir, bitrate=args.bitrate)
         if success and output_file:
-            print(f"Download complete! Saved to: {output_file}")
+            print(f"Saved to: {output_file}")
         else:
-            print(f"Download failed. See logs for details.")
+            print("Download failed. Check logs for details.")
     else:
-        print("No URL or batch file provided. Exiting.")
+        print("No URL or batch file provided. Use --help for usage.")
+        sys.exit(1)

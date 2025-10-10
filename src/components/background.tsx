@@ -3,14 +3,14 @@ import Particles from '@/components/Particles-code';
 
 export default function ParticlesBackground({ children }: { children?: React.ReactNode }) {
   const particlesConfig = useMemo(() => ({
-    particleColors: ['#280138', '#1d001f'],
-    particleCount: 300,
-    particleSpread: 10,
-    speed: 0.2,
+    particleColors: ['#ff1605', '#ff1605'],
+    particleCount: 400,
+    particleSpread: 3,
+    speed: 0.4,
     particleBaseSize: 100,
-    moveParticlesOnHover: false,
+    moveParticlesOnHover: true,
     alphaParticles: true,
-    disableRotation: true,
+    disableRotation: false,
   }), []);
 
   return (

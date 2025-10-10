@@ -1,24 +1,13 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "rootDir": "src/main",
-    "outDir": "dist/main",
-    "noEmit": false,
-    "sourceMap": true,
-    "declaration": false,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "allowSyntheticDefaultImports": true,
+    "rootDir": "./src/main",
+    "outDir": "./dist/main",
+    "composite": false,
     "types": ["node", "electron"],
     "lib": ["ES2022"],
-    "forceConsistentCasingInFileNames": true,
-    "allowJs": false
+    "sourceMap": true
   },
   "include": ["src/main/**/*.ts"],
-  "exclude": ["node_modules", "src/preload", "dist"]
+  "exclude": ["node_modules", "dist", "src/main/preload.ts"]
 }
