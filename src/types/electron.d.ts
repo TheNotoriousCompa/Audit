@@ -18,60 +18,68 @@ export interface DownloadOptions {
 // Download result type
 export interface DownloadResult {
   success: boolean;
-  filePath?: string;
-  output_path?: string;
+  message?: string;
+  outputPath?: string;
   error?: string;
-  [key: string]: string | number | boolean | undefined; // Allow additional properties with specific types
-  duration?: number;
-  fileSize?: number;
 }
 
-// Download progress type
-export type DownloadStatus = 'idle' | 'starting' | 'downloading' | 'converting' | 'finished' | 'error';
+// Download progress type - FIXED: changed 'idle' to 'ready' to match Python
+export type DownloadStatus = 'ready' | 'starting' | 'downloading' | 'converting' | 'finished' | 'error';
 
 export interface DownloadProgress {
-  percentage: number;
-  downloaded: number;
-  total: number;
-  speed: string;
-  eta: number; // in seconds
-  status: DownloadStatus;
-  message?: string;
-  isPlaylist?: boolean;
-  // Additional fields for more detailed progress tracking
-  _percent_str?: string;
-  downloaded_bytes?: number;
-  total_bytes?: number;
-  _speed_str?: string;
-  _eta_str?: string;
-  currentItem?: number;
-  totalItems?: number;
-  currentFile?: string;
+  // Core progress fields
+  percentage: number;         // 0-100
+  downloaded: number;         // bytes
+  total: number;              // bytes
+  speed: number;              // bytes/second
+  speed_str: string;          // human-readable speed (e.g., "1.2 MB/s")
+  eta: number;                // estimated seconds remaining
+  status: DownloadStatus;     // current status
+  message?: string;           // optional status message
+  
+  // Playlist information
+  isPlaylist?: boolean;       // whether this is part of a playlist
+  currentItem?: number;       // current item index (1-based)
+  totalItems?: number;        // total items in playlist
+  currentFile?: string;       // current filename being processed
+  
+  // Raw data from yt-dlp (for debugging)
+  _percent_str?: string;      // formatted percentage (e.g., "50.0%")
+  _speed_str?: string;        // original speed string from yt-dlp
+  _eta_str?: string;          // formatted ETA (e.g., "01:23")
+  downloaded_bytes?: number;  // raw downloaded bytes
+  total_bytes?: number;       // raw total bytes
+  
+  // Additional metadata
+  filename?: string;          // output filename
+  speed_raw?: number;         // raw speed in bytes/s (for calculations)
+  timestamp?: number;         // when this update was received (Date.now())
 }
+
+// Type for progress callback that can handle partial progress data
+type ProgressCallback = (event: IpcRendererEvent, progress: Partial<DownloadProgress> & Record<string, unknown>) => void;
 
 // Types for the Electron API
 export interface ElectronAPI {
-  // Funzioni per i controlli finestra
+  // Window control functions
   windowMinimize: () => void;
   windowMaximize: () => void;
   windowClose: () => void;
-
-  // Funzioni esistenti
-  selectFolder: () => Promise<string>;
-  downloadYoutube: (url: string, options: DownloadOptions) => Promise<DownloadResult>;
-  onDownloadProgress: (callback: (event: IpcRendererEvent, progress: DownloadProgress) => void) => void;
-  removeProgressListener: (listener: (event: IpcRendererEvent, progress: DownloadProgress) => void) => void;
   
-  // Nuova funzione per convertire YouTube
-  convertYoutube: (query: string, options?: DownloadOptions) => Promise<DownloadResult | string>;
+  // Download functions
+  convertYoutube: (query: string, options?: DownloadOptions) => Promise<DownloadResult>;
+  onDownloadProgress: (callback: ProgressCallback) => void;
+  removeProgressListener: (callback: ProgressCallback) => void;
+  selectFolder: () => Promise<string | null>;
+  downloadYoutube: (url: string, options: DownloadOptions) => Promise<DownloadResult>;
 }
 
-// Estendi React CSSProperties per proprietà personalizzate
+// Extend React CSSProperties for custom properties
 declare global {
   interface Window {
-    electronAPI: ElectronAPI; // ✅ Usa il tipo definito sopra
+    electronAPI: ElectronAPI;
   }
-
+  
   namespace React {
     interface CSSProperties {
       WebkitAppRegion?: 'drag' | 'no-drag';

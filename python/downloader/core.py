@@ -147,14 +147,58 @@ def download_media(
             # Post-processing - Set metadata if this is an MP3 file
             if format.lower() == 'mp3' and output_path.suffix.lower() == '.mp3':
                 try:
+                    logger.info("[DEBUG] Starting post-processing for MP3 file")
+                    
+                    # Get the best available thumbnail
+                    thumbnail_url = None
+                    
+                    # Try to get the highest resolution thumbnail
+                    if 'thumbnails' in info and info['thumbnails']:
+                        # Sort by resolution (width * height), highest first
+                        thumbnails = sorted(
+                            [t for t in info['thumbnails'] if t.get('url')],
+                            key=lambda x: x.get('width', 0) * x.get('height', 0),
+                            reverse=True
+                        )
+                        if thumbnails:
+                            thumbnail_url = thumbnails[0]['url']
+                    
+                    # Fall back to standard thumbnail if no thumbnails list
+                    if not thumbnail_url and 'thumbnail' in info:
+                        thumbnail_url = info['thumbnail']
+                    
+                    artwork = None
+                    if thumbnail_url:
+                        logger.info(f"[DEBUG] Found thumbnail URL: {thumbnail_url}")
+                        try:
+                            artwork = download_artwork(thumbnail_url)
+                            if artwork:
+                                logger.info(f"[DEBUG] Successfully downloaded artwork ({len(artwork)} bytes)")
+                            else:
+                                logger.warning("[DEBUG] Downloaded artwork is empty")
+                        except Exception as e:
+                            logger.error(f"[DEBUG] Error downloading artwork: {str(e)}")
+                    else:
+                        logger.warning("[DEBUG] No thumbnail URL found in video info")
+                    
+                    # Process metadata
+                    logger.info("[DEBUG] Setting MP3 metadata...")
                     postprocess(
                         file_path=output_path,
                         title=info.get('title', ''),
                         artist=info.get('uploader', ''),
-                        album=info.get('album', '')
+                        album=info.get('album', ''),
+                        artwork=artwork
                     )
+                    logger.info("[DEBUG] Metadata processing completed successfully")
+                    
                 except Exception as e:
-                    logger.warning(f"Metadata processing failed: {str(e)}")
+                    logger.exception(f"[ERROR] Metadata processing failed: {str(e)}")
+                    if progress_callback:
+                        progress_callback({
+                            'status': 'warning',
+                            'message': f'Warning: Metadata processing failed: {str(e)}'
+                        })
 
             return True, output_path, "Download completato con successo"
 
@@ -177,27 +221,53 @@ def _on_progress(d: dict[str, Any], callback: Optional[Callable] = None) -> None
         return
 
     try:
-        status = d.get('status')
+        status = d.get('status', '')
         
+        # Ensure we have consistent numeric types
+        downloaded_bytes = int(d.get('downloaded_bytes', 0) or 0)
+        total_bytes = int((d.get('total_bytes') or d.get('total_bytes_estimate') or 0))
+        
+        # Calculate percentage if not provided
+        percent_str = str(d.get('_percent_str', '0%')).strip()
+        if not percent_str.endswith('%'):
+            if total_bytes > 0:
+                percent = min(100, (downloaded_bytes / total_bytes) * 100)
+                percent_str = f"{percent:.1f}%"
+            else:
+                percent_str = "0%"
+                
         # Format progress data to match what the frontend expects
         progress_info = {
-            'status': status or '',
-            '_percent_str': str(d.get('_percent_str', '0%')),
-            'downloaded_bytes': d.get('downloaded_bytes', 0),
-            'total_bytes': d.get('total_bytes') or d.get('total_bytes_estimate', 0),
-            '_speed_str': d.get('_speed_str', 'N/A'),
-            '_eta_str': d.get('_eta_str', 'N/A'),
-            'filename': d.get('filename', '')
+            'status': status,
+            '_percent_str': percent_str,
+            'percentage': float(percent_str.rstrip('%')),  # Add numeric percentage
+            'downloaded_bytes': downloaded_bytes,
+            'total_bytes': total_bytes,
+            '_speed_str': d.get('_speed_str', '0 B/s'),
+            '_eta_str': d.get('_eta_str', '--:--'),
+            'filename': d.get('filename', ''),
+            'eta': d.get('eta', 0),  # Add numeric ETA in seconds
+            'speed': d.get('speed', 0),  # Add numeric speed in bytes/s
+            'is_playlist': bool(d.get('playlist_index') is not None)
         }
         
         # Special handling for finished status
         if status == 'finished':
             progress_info['_percent_str'] = '100%'
-            progress_info['progress'] = 1.0
+            progress_info['percentage'] = 100.0
+            progress_info['downloaded_bytes'] = total_bytes  # Ensure we show 100% complete
+        
+        # Debug logging
+        print(f"[PROGRESS] {progress_info}")
         
         # Call the callback with the formatted data
         if callable(callback):
             callback(progress_info)
+            
+    except Exception as e:
+        print(f"[ERROR] Error in progress callback: {str(e)}")
+        import traceback
+        traceback.print_exc()
             
     except Exception as e:
         logger.warning(f"Error in progress callback: {str(e)}", exc_info=True)

@@ -1,233 +1,232 @@
-import React from 'react';
+import * as React from 'react';
+import type { DownloadProgress, DownloadStatus } from '@/types/electron';
+
+type ProgressData = Partial<DownloadProgress> & {
+  // Add any additional properties specific to this component
+  filename?: string;
+};
 
 interface DownloadProgressProps {
-  progress: {
-    percentage: number;
-    downloaded: number;
-    total: number;
-    speed: string;
-    eta: string | number;
-    status: string;
-    message?: string;
-    _percent_str?: string;
-    downloaded_bytes?: number;
-    total_bytes?: number;
-    _speed_str?: string;
-    _eta_str?: string;
-  };
+  progress?: ProgressData;
+  className?: string;
 }
 
-const formatBytes = (bytes: number, decimals = 2): string => {
-  if (bytes === 0 || isNaN(bytes)) return '0 Bytes';
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-};
+const DownloadProgress: React.FC<DownloadProgressProps> = ({ progress = {}, className = '' }) => {
+  // Format file size for display
+  const formatBytes = (bytes: number, decimals = 1): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`;
+  };
 
-const formatTime = (eta: number | string): string => {
-  // If eta is already a string, try to parse it
-  if (typeof eta === 'string') {
-    // If it's already in HH:MM:SS or MM:SS format, return as is
-    if (/^(\d{1,2}:)?\d{1,2}:\d{2}$/.test(eta)) {
-      return eta;
+  // Format time (MM:SS)
+  const formatTime = (eta: number | string | undefined): string => {
+    if (eta === undefined || eta === null) return '--:--';
+    
+    // If it's already a string in MM:SS format, return as is
+    if (typeof eta === 'string' && /^\d+:\d{2}$/.test(eta)) return eta;
+    
+    // If it's a number (seconds), convert to MM:SS
+    const seconds = typeof eta === 'string' ? parseInt(eta, 10) : eta;
+    if (!isNaN(seconds) && seconds >= 0) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
-    // Try to convert string to number
-    const parsed = parseFloat(eta);
-    if (!isNaN(parsed)) {
-      eta = parsed;
-    } else {
-      return '--:--';
+    
+    return '--:--';
+  };
+
+  // Get appropriate color based on status
+  const getStatusColor = (status: DownloadStatus): string => {
+    switch (status) {
+      case 'downloading': return 'bg-blue-500';
+      case 'converting': return 'bg-purple-500';
+      case 'finished': return 'bg-green-500';
+      case 'error': return 'bg-red-500';
+      case 'idle' as DownloadStatus:
+      case 'starting' as DownloadStatus:
+      default: return 'bg-gray-500';
     }
-  }
+  };
 
-  // Handle number case (seconds)
-  if (eta < 0) return '--:--';
-  const h = Math.floor(eta / 3600);
-  const m = Math.floor((eta % 3600) / 60);
-  const s = Math.floor(eta % 60);
-  
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  }
-  return `${m}:${s.toString().padStart(2, '0')}`;
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'downloading':
-      return 'bg-blue-500';
-    case 'converting':
-      return 'bg-purple-500';
-    case 'finished':
-      return 'bg-green-500';
-    case 'error':
-      return 'bg-red-500';
-    default:
-      return 'bg-gray-500';
-  }
-};
-
-export const DownloadProgress: React.FC<DownloadProgressProps> = ({ progress }) => {
-  // Map the progress data to the expected format
-  const getMappedProgress = () => {
+  // Process and normalize progress data
+  const getProgressData = () => {
     // Default values
     let percentage = 0;
-    let status = 'ready';
-    let message = '';
+    let status: DownloadStatus = 'idle' as DownloadStatus;
     
-    // Calculate percentage from _percent_str if available
-    if (typeof progress._percent_str === 'string') {
+    // Calculate percentage from available data
+    if (progress?._percent_str) {
       const percentStr = progress._percent_str.replace(/[^\d.]/g, '');
-      percentage = parseFloat(percentStr) || 0;
-    } else if (typeof progress.percentage === 'number') {
-      percentage = progress.percentage;
+      percentage = Math.min(100, Math.max(0, parseFloat(percentStr) || 0));
+    } else if (typeof progress?.percentage === 'number') {
+      percentage = Math.min(100, Math.max(0, progress.percentage));
     }
     
-    // Determine status and message
-    if (progress.status) {
+    // Determine status with better type safety
+    if (progress?.status) {
       status = progress.status;
-    } else if (percentage > 0) {
+    } else if (percentage > 0 && percentage < 100) {
       status = 'downloading';
+    } else if (percentage === 100) {
+      status = 'finished';
     }
     
-    // Set appropriate message
-    if (progress.message) {
-      message = progress.message;
-    } else if (status === 'downloading') {
-      message = `Downloading... ${Math.round(percentage)}%`;
-    } else if (status === 'converting') {
-      message = 'Converting to MP3...';
-    } else if (status === 'finished') {
-      message = 'Download completed';
-    } else {
-      message = 'Ready';
+    // Get the best available speed string
+    const speedStr = progress?._speed_str || progress?.speed || '0 B/s';
+    
+    // Get the best available file size information
+    const downloadedBytes = progress?.downloaded_bytes || progress?.downloaded || 0;
+    const totalBytes = progress?.total_bytes || progress?.total || 0;
+    
+    // Format the status message
+    let statusMessage = progress?.message || '';
+    if (!statusMessage) {
+      switch (status) {
+        case 'downloading':
+          statusMessage = 'Downloading...';
+          break;
+        case 'converting':
+          statusMessage = 'Converting...';
+          break;
+        case 'finished':
+          statusMessage = 'Download completed';
+          break;
+        case 'error':
+          statusMessage = 'An error occurred';
+          break;
+        default:
+          statusMessage = 'Ready';
+      }
     }
     
-    // Ensure percentage is between 0-100
-    percentage = Math.min(100, Math.max(0, percentage));
+    // Handle playlist information if available
+    let playlistInfo = '';
+    if (progress?.totalItems && progress.totalItems > 1) {
+      const current = (progress.currentItem || 0) + 1;
+      const total = progress.totalItems;
+      playlistInfo = `(${current} of ${total}) `;
+    }
+    
+    // Get current file name if available and ensure it has .mp3 extension
+    const currentFile = (progress?.currentFile || progress?.filename || '').replace(/\.(webm|m4a|mp4)$/i, '.mp3');
+    
+    // Get formatted ETA
+    const eta = progress?._eta_str || formatTime(progress?.eta);
     
     return {
-      percentage: percentage,
-      downloaded: progress.downloaded_bytes || progress.downloaded || 0,
-      total: progress.total_bytes || progress.total || 0,
-      speed: progress._speed_str || progress.speed || '0 B/s',
-      eta: progress._eta_str || progress.eta || '--:--',
-      status: status,
-      message: message,
-      _percent_str: progress._percent_str || `${Math.round(percentage)}%`
+      percentage,
+      status,
+      speed: speedStr,
+      eta,
+      downloaded: downloadedBytes,
+      total: totalBytes,
+      message: statusMessage,
+      playlistInfo,
+      currentFile
     };
   };
 
-  const mappedProgress = getMappedProgress();
-  const { percentage, downloaded, total, speed, eta, status, message } = mappedProgress;
-  
-  const [showSuccess, setShowSuccess] = React.useState(false);
+  const {
+    percentage,
+    status,
+    speed,
+    eta,
+    downloaded,
+    total,
+    message,
+    playlistInfo,
+    currentFile
+  } = getProgressData();
+
+  // Animate progress bar
   const [displayPercentage, setDisplayPercentage] = React.useState(0);
-  const [displayedStatus, setDisplayedStatus] = React.useState(status);
-
-  // Smooth percentage animation
   React.useEffect(() => {
-    const animate = () => {
-      setDisplayPercentage(prev => {
-        // If we're at 100%, make sure we show exactly 100%
-        if (percentage >= 100) return 100;
-        
-        // Smooth animation for progress updates
-        const diff = percentage - prev;
-        if (Math.abs(diff) > 0.5) {
-          return prev + (diff * 0.2); // Slightly faster animation
-        }
-        return percentage;
-      });
-    };
-
-    const timer = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(timer);
+    const timer = setTimeout(() => setDisplayPercentage(percentage), 50);
+    return () => clearTimeout(timer);
   }, [percentage]);
 
-  // Handle status changes
+  // Show success message when download completes
+  const [showSuccess, setShowSuccess] = React.useState(false);
   React.useEffect(() => {
     if (status === 'finished') {
-      setDisplayedStatus('finished');
-      setDisplayPercentage(100); // Ensure we show 100% when finished
       setShowSuccess(true);
       const timer = setTimeout(() => setShowSuccess(false), 5000);
       return () => clearTimeout(timer);
-    } else if (status === 'downloading' || status === 'converting' || status === 'processing') {
-      setDisplayedStatus(status);
-    } else if (status === 'error') {
-      setDisplayedStatus('error');
-    } else if (percentage > 0) {
-      // If we have progress but no specific status, default to downloading
-      setDisplayedStatus('downloading');
-    } else {
-      setDisplayedStatus('ready');
     }
-  }, [status, percentage]);
-  
-  // Always render the component, but control visibility with opacity
+  }, [status]);
+
+  // Don't show anything if there's no active download and no message
+  const shouldHide = !showSuccess && !message && (!status || status === ('idle' as DownloadStatus));
+  if (shouldHide) {
+    return null;
+  }
+
   return (
-    <div className="w-full mt-6 space-y-2">
+    <div className={`w-full space-y-3 p-4 bg-gray-800/30 rounded-lg border border-gray-700/50 ${className}`}>
       {/* Success notification */}
       {showSuccess && (
-        <div className="mb-2 p-2 bg-green-500/20 border border-green-500/50 rounded-md text-green-200 text-sm">
-          Download completed successfully!
+        <div className="mb-3 p-2 bg-green-500/20 border border-green-500/50 rounded text-sm text-green-200">
+          {message || 'Download completed successfully!'}
         </div>
       )}
-      
-      {/* Status and percentage */}
-      <div className="flex justify-between text-sm">
-        <div className="flex items-center">
-          <div className={`w-2.5 h-2.5 rounded-full mr-2 ${getStatusColor(status)}`}></div>
-          <span className="text-gray-300 capitalize">
-            {displayedStatus === 'downloading' ? 'Downloading' : 
-             displayedStatus === 'converting' ? 'Converting' : 
-             displayedStatus === 'processing' ? 'Processing' :
-             displayedStatus === 'finished' ? 'Completed' : 
-             displayedStatus === 'error' ? 'Error' : 'Ready'}
-            {(displayedStatus === 'downloading' || displayedStatus === 'converting' || displayedStatus === 'processing') && total > 0 && ` (${formatBytes(downloaded)} / ${formatBytes(total)})`}
-            {(displayedStatus === 'downloading' || displayedStatus === 'converting' || displayedStatus === 'processing') && speed && ` • ${speed}`}
-            {(displayedStatus === 'downloading' || displayedStatus === 'converting' || displayedStatus === 'processing') && eta && ` • ETA: ${formatTime(eta)}`}
+
+      {/* Status row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor(status)}`} />
+          <span className="text-sm font-medium text-gray-200">
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+            {playlistInfo && <span className="text-gray-400 ml-1">{playlistInfo}</span>}
           </span>
         </div>
-        <span className="text-gray-300">
-          {status === 'finished' ? '100%' : `${Math.round(displayPercentage)}%`}
-        </span>
       </div>
-      
-      {/* Progress bar - always render but control visibility */}
-      <div className="w-full bg-gray-800/30 rounded-full h-2.5 overflow-hidden">
-        <div 
-          className={`h-full rounded-full transition-all duration-300 ease-out ${
-            displayedStatus === 'error' ? 'bg-red-500' :
-            displayedStatus === 'finished' ? 'bg-green-500' :
-            displayedStatus === 'downloading' ? 'bg-blue-500' :
-            displayedStatus === 'converting' ? 'bg-purple-500' :
-            'bg-gray-500'
-          }`}
-          style={{ 
-            width: `${status === 'finished' ? 100 : Math.max(2, displayPercentage)}%`,
-            minWidth: '0.5rem' // Ensure it's always visible when there's progress
-          }}
-        />
-      </div>
-      
-      {/* Speed and ETA - Only show when downloading */}
-      {status === 'downloading' && (
-        <div className="flex justify-between text-xs text-gray-400">
-          <span>{speed}</span>
-          <span>ETA: {formatTime(eta)}</span>
+
+      {/* Current file name */}
+      {currentFile && (
+        <div className="text-xs text-gray-400 truncate" title={currentFile}>
+          {currentFile}
         </div>
       )}
-      
+
+      {/* Progress bar */}
+      <div className="w-full h-2.5 bg-gray-700/50 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-300 ease-out"
+          style={{ width: `${displayPercentage}%` }}
+        />
+      </div>
+
+      {/* Progress details */}
+      <div className="flex flex-col space-y-1 text-xs text-gray-400">
+        {/* File size and progress */}
+        <div className="flex items-center justify-between">
+          <span className="font-mono">{formatBytes(downloaded)} / {formatBytes(total)}</span>
+          <span className="text-gray-300">{Math.round(percentage)}%</span>
+        </div>
+        
+        {/* Speed and ETA */}
+        <div className="flex items-center justify-between">
+          <span className="whitespace-nowrap">
+            <span className="text-gray-300">Speed:</span> {speed}
+          </span>
+          <span className="whitespace-nowrap">
+            <span className="text-gray-300">ETA:</span> {eta}
+          </span>
+        </div>
+      </div>
+
       {/* Status message */}
-      {message && (
-        <div className="text-xs text-gray-400 mt-1 truncate">
+      {message && !showSuccess && (
+        <div className="text-xs text-gray-400">
           {message}
         </div>
       )}
     </div>
   );
 };
+
+export default DownloadProgress;

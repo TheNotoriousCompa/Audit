@@ -1,9 +1,9 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import ParticlesBackground from "@/components/background";
-import { DownloadProgress as DownloadProgressComponent } from "@/components/DownloadProgress";
+import DownloadProgressComponent from "@/components/DownloadProgress";
 import { Settings, Download, FolderOpen, FileSpreadsheet, FileText, Minus, Square, X } from "lucide-react";
-import type { DownloadProgress } from '@/types/electron';
+import type { DownloadProgress, DownloadStatus } from '@/types/electron';
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -20,18 +20,23 @@ export default function Home() {
     percentage: 0,
     downloaded: 0,
     total: 0,
-    speed: '0 KB/s',
-    eta: -1,
-    status: 'idle',
+    speed: 0,
+    speed_str: '0 B/s',
+    eta: 0,
+    status: 'ready',
     message: '',
     _percent_str: '0%',
-    downloaded_bytes: 0,
-    total_bytes: 0,
     _speed_str: '0 B/s',
     _eta_str: '--:--',
+    downloaded_bytes: 0,
+    total_bytes: 0,
     currentItem: 0,
     totalItems: 0,
-    currentFile: ''
+    currentFile: '',
+    isPlaylist: false,
+    filename: '',
+    speed_raw: 0,
+    timestamp: Date.now()
   });
   const [processPlaylist, setProcessPlaylist] = useState(false);
   const [isPlaylist, setIsPlaylist] = useState(false);
@@ -39,33 +44,91 @@ export default function Home() {
   // Register progress listener from Python script
   useEffect(() => {
     if (typeof window !== 'undefined' && window.electronAPI?.onDownloadProgress) {
-      const handleProgress = (event: unknown, data: DownloadProgress) => {
-        console.log('Progress update:', {
-          ...data,
-          hasPercentStr: '_percent_str' in data,
-          hasPercentage: 'percentage' in data,
-          hasStatus: 'status' in data,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Ensure we have valid progress data before updating
-        if (data) {
-          const newProgress = {
-            ...data,
-            // Ensure we have a status, default to 'downloading' if we have progress but no status
-            status: data.status || (data.percentage > 0 ? 'downloading' : 'ready'),
-            // Calculate percentage from _percent_str if available
-            percentage: data.percentage !== undefined ? data.percentage : 
-                      (data._percent_str ? 
-                        parseFloat(data._percent_str.replace(/[^\d.]/g, '')) : 
-                        (data.percentage || 0))
+      const handleProgress = (event: unknown, data: Partial<DownloadProgress> & Record<string, unknown>) => {
+        try {
+          // Log raw data for debugging
+          console.log('[Progress] Raw data:', JSON.stringify(data, null, 2));
+          
+          // Normalize the progress data
+          const now = Date.now();
+          const timestamp = now;
+          
+          // Extract and calculate values
+          const percentage = data.percentage !== undefined ? 
+            Number(data.percentage) : 
+            (data._percent_str ? 
+              parseFloat(data._percent_str.replace(/[^\d.]/g, '')) || 0 : 0);
+              
+          const downloaded = Number(data.downloaded_bytes || data.downloaded || 0);
+          const total = Number(data.total_bytes || data.total || 0);
+          
+          // Calculate speed (convert from string like "1.2 MB/s" to bytes/s)
+          let speed = 0;
+          const speed_str = data.speed_str || data._speed_str || '0 B/s';
+          if (data.speed) {
+            speed = Number(data.speed);
+          } else if (data._speed_str) {
+            // Parse speed string (e.g., "1.2 MB/s")
+            const speedMatch = data._speed_str.match(/([\d.]+)\s*([KMG]?B)\/s/);
+            if (speedMatch) {
+              const value = parseFloat(speedMatch[1]);
+              const unit = speedMatch[2];
+              const multiplier = 
+                unit === 'KB' ? 1024 :
+                unit === 'MB' ? 1024 * 1024 :
+                unit === 'GB' ? 1024 * 1024 * 1024 : 1;
+              speed = value * multiplier;
+            }
+          }
+          
+          // Parse ETA (can be in seconds or MM:SS format)
+          let eta = 0;
+          if (typeof data.eta === 'number') {
+            eta = data.eta;
+          } else if (data._eta_str && data._eta_str !== '--:--') {
+            // Parse MM:SS format
+            const [minutes, seconds] = String(data._eta_str).split(':').map(Number);
+            eta = (minutes * 60) + (seconds || 0);
+          }
+          
+          // Build the normalized progress object
+          // Safely get totalItems, defaulting to 0 if undefined
+          const totalItems = typeof data.totalItems === 'number' ? data.totalItems : 0;
+          
+          const newProgress: DownloadProgress = {
+            percentage: Math.min(100, Math.max(0, percentage)),
+            downloaded,
+            total,
+            speed,
+            speed_str: typeof data.speed_str === 'string' ? data.speed_str : 
+                      typeof data._speed_str === 'string' ? data._speed_str : '0 B/s',
+            eta,
+            status: (typeof data.status === 'string' ? data.status : 'downloading') as DownloadStatus,
+            message: typeof data.message === 'string' ? data.message : '',
+            _percent_str: typeof data._percent_str === 'string' ? data._percent_str : `${percentage}%`,
+            _speed_str: typeof data._speed_str === 'string' ? data._speed_str : speed_str,
+            _eta_str: typeof data._eta_str === 'string' ? data._eta_str : '--:--',
+            downloaded_bytes: downloaded,
+            total_bytes: total,
+            currentItem: typeof data.currentItem === 'number' ? data.currentItem : 0,
+            totalItems,
+            currentFile: typeof data.currentFile === 'string' ? data.currentFile : 
+                        typeof data.filename === 'string' ? data.filename : '',
+            isPlaylist: Boolean(data.isPlaylist || totalItems > 1),
+            filename: typeof data.filename === 'string' ? data.filename : 
+                     typeof data.currentFile === 'string' ? data.currentFile : '',
+            speed_raw: speed,
+            timestamp
           };
           
-          console.log('Setting progress:', newProgress);
+          console.log('[Progress] Normalized:', newProgress);
           setProgress(prev => ({
             ...prev,
             ...newProgress
           }));
+          
+        } catch (error) {
+          console.error('Error processing progress update:', error, 'Data:', data);
         }
       };
 
@@ -107,7 +170,7 @@ export default function Home() {
   }, [url]);
 
   // Helper: check if URL has playlist parameters
-  function hasPlaylistParams(str: string) {
+  function hasPlaylistParams(str: string): boolean {
     try {
       const url = new URL(str);
       return url.searchParams.has('list') || url.pathname.includes('/playlist');
@@ -154,10 +217,23 @@ export default function Home() {
       percentage: 0,
       downloaded: 0,
       total: 0,
-      speed: '0 KB/s',
-      eta: -1,
+      speed: 0,  // speed is a number (bytes/second)
+      speed_str: '0 B/s',  // human-readable speed
+      eta: 0,  // eta is a number (seconds)
       status: 'starting',
-      message: 'Starting batch download...'
+      message: 'Starting batch download...',
+      _percent_str: '0%',
+      _speed_str: '0 B/s',
+      _eta_str: '--:--',
+      downloaded_bytes: 0,
+      total_bytes: 0,
+      currentItem: 0,
+      totalItems: 0,
+      currentFile: '',
+      isPlaylist: false,
+      filename: '',
+      speed_raw: 0,
+      timestamp: Date.now()
     });
 
     try {
@@ -196,7 +272,7 @@ export default function Home() {
       setTimeout(() => {
         setProgress(prev => ({
           ...prev,
-          status: 'idle',
+          status: 'idle' as DownloadStatus,
           percentage: 0,
           message: ''
         }));
@@ -317,7 +393,7 @@ export default function Home() {
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className={`absolute top-12 right-4 sm:top-16 sm:right-6 p-3 rounded-full transition-all duration-200 ${
-            showAdvanced ? 'bg-blue-600/50 text-white' : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/70 hover:text-white'
+            showAdvanced ? 'bg-black/1 text-white' : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/70 hover:text-white'
           }`}
           title="Settings"
         >
@@ -325,9 +401,6 @@ export default function Home() {
         </button>
 
         <div className="w-full max-w-3xl bg-gray-900/60 backdrop-blur-xs rounded-2xl p-4 sm:p-6 md:p-8 shadow-2xl border border-gray-700/50 mx-2 sm:mx-4">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-6 sm:mb-8 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-            Simple MP3 Downloader
-          </h1>
           <div className="space-y-4 w-full">
             <div className="flex gap-2 w-full">
               <div className="flex-1">

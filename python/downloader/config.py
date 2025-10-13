@@ -73,15 +73,43 @@ def get_ydl_opts(
         'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
         'noplaylist': True,  # overridden by core.py if needed
         'ignoreerrors': True,
-        'no_warnings': False,
+        'no_warnings': False,  # Show warnings for debugging
         'quiet': False,
         'writethumbnail': True,
+        'writethumbnail': True,
+        'embedthumbnail': True,
+        'postprocessors': [
+            # First extract the audio
+            {
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': format,
+                'preferredquality': str(bitrate)
+            },
+            # Then embed the thumbnail
+            {
+                'key': 'EmbedThumbnail',
+                'already_have_thumbnail': False
+            },
+            # Finally add metadata
+            {
+                'key': 'FFmpegMetadata',
+                'add_metadata': True,
+                'add_chapters': True
+            }
+        ],
         'prefer_ffmpeg': True,
-        'postprocessors': postprocessors,
+        'ffmpeg_location': None,  # Let yt-dlp find ffmpeg automatically
         'cachedir': False,
         'socket_timeout': DEFAULT_TIMEOUT,
-        'source_address': None,  # can be set for IP rotation
+        'source_address': None,
         'geo_bypass': True,
+        'postprocessor_args': [
+            '-movflags', 'use_metadata_tags',
+            '-id3v2_version', '3',
+            '-write_id3v1', '1',
+            '-strict', 'experimental'
+        ],
+        'logger': logging.getLogger('yt-dlp')
     }
 
     return ydl_opts

@@ -1,21 +1,5 @@
 """
 Logging configuration and utilities for the YouTube to MP3 converter.
-
-This module provides a centralized logging configuration and utilities for the application.
-It includes a ProgressReporter class for tracking download progress and formatting
-log messages consistently across the application.
-
-Key Features:
-- Standardized log formatting with timestamps and log levels
-- Progress tracking and reporting
-- Support for both console and file logging
-- Integration with the IPC system for progress updates
-
-Dependencies:
-- logging: For log message handling
-- typing: For type hints
-- datetime: For timestamp generation
-- sys: For standard output handling
 """
 import logging
 import json
@@ -44,44 +28,123 @@ class ProgressReporter:
 
 def setup_logging(log_file: Optional[str] = None, level: int = logging.INFO) -> None:
     """Configure logging for the application."""
-    # Clear any existing handlers
     logging.getLogger().handlers = []
     
-    # Configure root logger
     logger = logging.getLogger()
     logger.setLevel(level)
     
-    # Create formatter
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
-    # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     
-    # File handler if log file is specified
     if log_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
     
-    # Disable propagation to avoid duplicate logs
     logger.propagate = False
 
 def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Format progress data for the frontend."""
+    """Format progress data for the frontend.
+    
+    Returns:
+        Dict with fields matching the TypeScript DownloadProgress interface.
+    """
     try:
-        # Ensure all values are JSON-serializable
-        return {
-            'status': str(data.get('status', '')),
-            'percentage': float(str(data.get('_percent_str', '0')).rstrip('%') or 0),
-            'downloaded': int(data.get('downloaded_bytes', 0)),
-            'total': int(data.get('total_bytes') or data.get('total_bytes_estimate', 0)),
-            'speed': str(data.get('_speed_str', 'N/A')),
-            'eta': str(data.get('_eta_str', 'N/A')),
-            'filename': str(data.get('filename', '').split('/')[-1]),
-            'message': str(data.get('message', ''))
+        # Calculate percentage
+        percentage = 0
+        if data.get('_percent_str'):
+            try:
+                percentage = float(str(data['_percent_str']).replace('%', '').strip())
+            except (ValueError, AttributeError):
+                percentage = 0
+        elif data.get('percentage') is not None:
+            percentage = float(data.get('percentage', 0))
+        
+        # Parse ETA - convert from string to seconds if needed
+        eta = 0
+        eta_str = '--:--'
+        if data.get('_eta_str'):
+            eta_str = str(data['_eta_str'])
+            try:
+                if ':' in eta_str:
+                    parts = eta_str.split(':')
+                    if len(parts) == 2:
+                        m, s = map(int, parts)
+                        eta = m * 60 + s
+            except (ValueError, AttributeError):
+                eta = 0
+        elif data.get('eta') is not None:
+            eta = int(data.get('eta', 0))
+            mins = eta // 60
+            secs = eta % 60
+            eta_str = f"{mins}:{secs:02d}"
+        
+        # Determine status - CRITICAL: use 'ready' instead of 'idle'
+        status = data.get('status', 'ready')
+        
+        # Map Python yt-dlp status to our status types
+        if status == 'downloading':
+            status = 'downloading'
+        elif status == 'finished':
+            status = 'finished'
+            percentage = 100
+        elif status == 'error':
+            status = 'error'
+        elif percentage > 0 and percentage < 100:
+            status = 'downloading'
+        elif percentage >= 100:
+            status = 'finished'
+        else:
+            status = 'ready'
+        
+        # Get file sizes
+        downloaded_bytes = int(data.get('downloaded_bytes') or data.get('downloaded') or 0)
+        total_bytes = int(data.get('total_bytes') or data.get('total') or 0)
+        
+        # Get speed
+        speed_str = str(data.get('_speed_str') or data.get('speed') or '0 B/s')
+        
+        # Get current file name
+        current_file = ''
+        if data.get('filename'):
+            current_file = str(data['filename']).split('/')[-1].split('\\')[-1]
+        elif data.get('currentFile'):
+            current_file = str(data['currentFile'])
+        
+        # Format the response to match TypeScript interface
+        formatted = {
+            'status': status,
+            'percentage': float(percentage),
+            'downloaded': downloaded_bytes,
+            'total': total_bytes,
+            'speed': speed_str,
+            'eta': eta,
+            'message': str(data.get('message', '')),
+            # Include raw values for compatibility
+            '_percent_str': f"{percentage}%",
+            'downloaded_bytes': downloaded_bytes,
+            'total_bytes': total_bytes,
+            '_speed_str': speed_str,
+            '_eta_str': eta_str,
+            'currentFile': current_file
         }
+        
+        return formatted
+        
     except Exception as e:
         logging.error(f"Error formatting progress data: {e}")
-        return {'status': 'error', 'message': str(e)}
+        return {
+            'status': 'error',
+            'message': str(e),
+            'percentage': 0,
+            'downloaded': 0,
+            'total': 0,
+            'speed': '0 B/s',
+            'eta': 0,
+            '_percent_str': '0%',
+            '_speed_str': '0 B/s',
+            '_eta_str': '--:--'
+        }

@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import path from "path";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 import isDev from "electron-is-dev";
-import type { DownloadOptions, DownloadProgress, DownloadResult } from '../types/electron';
+import type { DownloadOptions, DownloadResult } from '../types/electron';
 
 // Define local types
 type PythonProcess = ChildProcessWithoutNullStreams & {
@@ -12,25 +12,19 @@ type PythonProcess = ChildProcessWithoutNullStreams & {
   stdin: NodeJS.WritableStream;
 };
 
-// In CommonJS, __dirname e __filename sono disponibili globalmente
-// Non è necessario ridefinirli usando import.meta.url
 let mainWindow: BrowserWindow | null = null;
 
 // --- Function to create the main window ---
 function createWindow() {
-  // Get the correct path for the preload script
   let preloadPath: string;
   
   if (isDev) {
-    // In development, preload.js is in dist/preload/ after compilation
     preloadPath = path.join(__dirname, '..', '..', 'dist', 'preload', 'preload.js');
     console.log('Development preload path:', preloadPath);
   } else {
-    // In production, use the built file
     preloadPath = path.join(process.resourcesPath, 'app/dist/preload/preload.js');
   }
   
-  // Ensure the path is absolute
   if (!path.isAbsolute(preloadPath)) {
     preloadPath = path.resolve(preloadPath);
   }
@@ -57,19 +51,17 @@ function createWindow() {
     },
   });
 
-  // Load Next.js or built output
   const url = isDev
     ? "http://localhost:3000"
-    : `file://${path.join(__dirname, "../../../out/index.html")}`; // Modificato per CJS
+    : `file://${path.join(__dirname, "../../../out/index.html")}`;
 
   console.log("Loading URL:", url);
 
-  // Function to load the URL with retry logic
   const loadApp = (retryCount = 0) => {
     if (!mainWindow) return;
     
     const maxRetries = 10;
-    const retryDelay = 1000; // 1 second
+    const retryDelay = 1000;
 
     mainWindow.loadURL('http://localhost:3000').catch((err) => {
       console.warn(`Failed to load URL (attempt ${retryCount + 1}/${maxRetries}):`, err);
@@ -84,10 +76,8 @@ function createWindow() {
     });
   };
 
-  // Start loading the app
   loadApp();
 
-  // Open the DevTools in development mode
   if (isDev && mainWindow) {
     mainWindow.webContents.on('did-finish-load', () => {
       mainWindow?.webContents.openDevTools({ mode: 'detach' });
@@ -99,10 +89,9 @@ function createWindow() {
   });
 }
 
-// --- Funzione ausiliaria per eseguire lo script Python ---
+// --- Function to run download script ---
 async function runDownloadScript(url: string, options: DownloadOptions): Promise<DownloadResult> {
   return new Promise((resolve) => {
-    // Point to the main Python script
     const scriptPath = isDev
       ? path.join(__dirname, "../../python/main.py")
       : path.join(process.resourcesPath, "app/python/main.py");
@@ -112,14 +101,11 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
     // Ensure output directory exists and is writable
     if (options.outputDir) {
       try {
-        // Normalize and resolve the output directory path
         const outputDir = path.resolve(options.outputDir);
         console.log(`Ensuring output directory exists: ${outputDir}`);
         
-        // Create directory recursively if it doesn't exist
         fs.mkdirSync(outputDir, { recursive: true });
         
-        // Verify the directory is writable
         try {
           const testFile = path.join(outputDir, '.write-test');
           fs.writeFileSync(testFile, 'test');
@@ -133,7 +119,6 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
           });
         }
         
-        // Update the outputDir in options to use the normalized path
         options.outputDir = outputDir;
       } catch (err: unknown) {
         console.error('Failed to create output directory:', err);
@@ -144,25 +129,19 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
         });
       }
     } else {
-      // Use current working directory if no output directory is specified
       options.outputDir = process.cwd();
       console.log(`Using current working directory: ${options.outputDir}`);
     }
 
     const args = [scriptPath];
-    
-    // Add URL (required)
     args.push(url);
     
-    // Normalize and add output directory (positional argument)
     const outputDir = path.normalize(options.outputDir || process.cwd());
     
-    // Ensure the output directory exists and is writable
     try {
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
-      // Test write access
       const testFile = path.join(outputDir, '.write-test');
       fs.writeFileSync(testFile, 'test');
       fs.unlinkSync(testFile);
@@ -177,7 +156,6 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
 
     args.push(outputDir);
     
-    // Add other options
     if (options.format) args.push('--format', options.format);
     if (options.quality) args.push('--quality', options.quality);
     if (options.processPlaylist) args.push('--process-playlist');
@@ -185,84 +163,77 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
     console.log('Using output directory:', outputDir);
     console.log('Running command:', 'python', args.join(' '));
 
-    // Spawn the Python process
     const pythonProcess: PythonProcess = spawn('python', args, {
       stdio: ['pipe', 'pipe', 'pipe']
     }) as PythonProcess;
 
-    // Handle stdout data
-    let buffer = '';
+    let stdoutBuffer = '';
+    
     pythonProcess.stdout.on('data', (data: Buffer) => {
       const output = data.toString();
       if (!output) return;
       
-      // Append to buffer in case of partial JSON
-      buffer += output;
+      stdoutBuffer += output;
       
-      // Process complete JSON objects in the buffer
-      let newlineIndex: number;
-      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-        const line = buffer.substring(0, newlineIndex).trim();
-        buffer = buffer.substring(newlineIndex + 1);
-        
-        if (!line) continue;
+      const lines = stdoutBuffer.split('\n');
+      stdoutBuffer = lines.pop() || '';
+      
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('{')) continue;
         
         try {
-          // Handle both JSON and non-JSON lines
-          if (line.startsWith('{')) {
-            const data = JSON.parse(line);
+          const parsed = JSON.parse(trimmed);
+          
+          if (parsed.type === 'progress' && parsed.data) {
+            const progressData = parsed.data;
             
-            // Handle progress updates
-            if (data.type === 'progress' && data.data) {
-              const progressData = data.data;
-              // Validate progress data structure
-              if (typeof progressData === 'object') {
-                // Ensure required fields exist with proper types
-                const safeProgress: DownloadProgress & { filename?: string } = {
-                  status: progressData.status || 'downloading',
-                  percentage: typeof progressData.percentage === 'number' 
-                    ? progressData.percentage 
-                    : parseFloat(progressData.percentage) || 0,
-                  downloaded: typeof progressData.downloaded === 'number'
-                    ? progressData.downloaded
-                    : Number(progressData.downloaded) || 0,
-                  total: typeof progressData.total === 'number'
-                    ? progressData.total
-                    : Number(progressData.total) || 0,
-                  speed: progressData.speed ? String(progressData.speed) : '0 KB/s',
-                  eta: typeof progressData.eta === 'number' ? progressData.eta : -1,
-                  filename: progressData.filename ? String(progressData.filename) : '',
-                  message: progressData.message ? String(progressData.message) : ''
-                };
-                
-                console.log('[PROGRESS]', safeProgress.status, safeProgress.percentage + '%');
-                
-                // Send progress to renderer
-                if (mainWindow && !mainWindow.isDestroyed()) {
-                  mainWindow.webContents.send('download-progress', safeProgress);
-                }
-              }
+            const safeProgress = {
+              status: String(progressData.status || 'downloading'),
+              percentage: Number(progressData.percentage || 0),
+              downloaded: Number(progressData.downloaded_bytes || progressData.downloaded || 0),
+              total: Number(progressData.total_bytes || progressData.total || 0),
+              speed: String(progressData._speed_str || progressData.speed || '0 B/s'),
+              eta: Number(progressData.eta || 0),
+              message: String(progressData.message || ''),
+              _percent_str: String(progressData._percent_str || '0%'),
+              _speed_str: String(progressData._speed_str || '0 B/s'),
+              _eta_str: String(progressData._eta_str || '--:--'),
+              filename: progressData.filename 
+                ? String(progressData.filename).split(/[/\\]/).pop() 
+                : (progressData.currentFile ? String(progressData.currentFile) : ''),
+              currentFile: progressData.filename 
+                ? String(progressData.filename).split(/[/\\]/).pop() 
+                : (progressData.currentFile ? String(progressData.currentFile) : ''),
+              downloaded_bytes: Number(progressData.downloaded_bytes || progressData.downloaded || 0),
+              total_bytes: Number(progressData.total_bytes || progressData.total || 0)
+            };
+            
+            console.log('[PROGRESS UPDATE]', {
+              status: safeProgress.status,
+              percentage: safeProgress.percentage,
+              message: safeProgress.message
+            });
+            
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('download-progress', safeProgress);
             }
-            // Handle final result
-            else if (data.type === 'result' && data.data) {
-              const resultData = data.data;
-              console.log('Download completed:', resultData);
-              const result: DownloadResult = {
-                success: resultData.success,
-                message: resultData.message || '',
-                outputPath: resultData.output_path || '',
-                error: resultData.error || ''
-              };
-              resolve(result);
-              return;
-            }
-          } else {
-            // Handle non-JSON lines (log messages)
-            console.log('[PYTHON]', line);
+          }
+          else if (parsed.type === 'result' && parsed.data) {
+            const resultData = parsed.data;
+            const result: DownloadResult = {
+              success: Boolean(resultData.success),
+              message: String(resultData.message || ''),
+              outputPath: String(resultData.output_path || ''),
+              error: String(resultData.error || '')
+            };
+            console.log('[DOWNLOAD RESULT]', result);
+            resolve(result);
+            return;
           }
         } catch (error) {
-          console.error('Error parsing data:', error);
-          console.log('Raw data that caused error:', line);
+          console.error('[JSON Parse Error]', error);
+          console.log('[Raw line]', trimmed);
         }
       }
     });
@@ -270,79 +241,57 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
     pythonProcess.stderr.on('data', (data: Buffer) => {
       const output = data.toString().trim();
       if (!output) return;
-
-      // Handle progress messages from Python
-      if (output.includes('[PROGRESS]')) {
-        const match = output.match(/\[PROGRESS\]\s*(\w+)\s*-\s*([\d.]+)%/);
-        if (match) {
-          const status = match[1];
-          const percentage = parseFloat(match[2]);
-          
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            const progressData = {
-              status: status,
-              percentage: percentage,
-              _percent_str: `${percentage}%`,
-              message: status === 'finished' ? 'Download completed' : `${status}...`,
-              speed: '0 B/s',
-              eta: '--:--',
-              downloaded: 0,
-              total: 0,
-              filename: ''
-            };
-            
-            console.log('Progress update:', progressData);
-            mainWindow.webContents.send('download-progress', progressData);
-          }
-          return;
-        }
+      
+      if (output.includes('[PROGRESS]') || output.includes('[INFO]')) {
+        console.log('[PYTHON LOG]', output);
+        return;
       }
       
-      // Handle download progress from yt-dlp
-      const downloadMatch = output.match(/\[download\]\s*([\d.]+)% of/);
-      if (downloadMatch) {
-        const percentage = parseFloat(downloadMatch[1]);
-        if (!isNaN(percentage) && mainWindow && !mainWindow.isDestroyed()) {
-          const progressData = {
-            status: 'downloading',
-            percentage: percentage,
-            _percent_str: `${percentage}%`,
-            message: `Downloading... ${percentage}%`,
-            speed: '0 B/s',
-            eta: '--:--',
+      if (output.includes('[ERROR]')) {
+        console.error('[PYTHON ERROR]', output);
+        
+        const errorMatch = output.match(/\[ERROR\]\s*(.+)/);
+        if (errorMatch && mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('download-progress', {
+            status: 'error',
+            message: errorMatch[1],
+            percentage: 0,
             downloaded: 0,
             total: 0,
-            filename: ''
-          };
-          
-          console.log('Download progress:', progressData);
-          mainWindow.webContents.send('download-progress', progressData);
-          return;
+            speed: '0 B/s',
+            eta: 0,
+            _percent_str: '0%',
+            _speed_str: '0 B/s',
+            _eta_str: '--:--',
+            downloaded_bytes: 0,
+            total_bytes: 0
+          });
         }
+        return;
       }
       
-      // Handle JSON messages
       try {
-        const data = JSON.parse(output);
-        console.log('JSON message:', data);
-        
-        if (data.type === 'error' && data.message) {
-          console.error(`[ERROR] ${data.message}`);
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('download-progress', {
-              status: 'error',
-              message: data.message,
-              percentage: 0
-            });
+        if (output.startsWith('{')) {
+          const parsed = JSON.parse(output);
+          if (parsed.type === 'error') {
+            console.error('[PYTHON JSON ERROR]', parsed.message);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('download-progress', {
+                status: 'error',
+                message: parsed.message || 'Unknown error',
+                percentage: 0,
+                downloaded: 0,
+                total: 0,
+                speed: '0 B/s',
+                eta: 0
+              });
+            }
           }
+        } else {
+          console.error('[PYTHON STDERR]', output);
         }
       } catch {
-        // Log non-JSON, non-PROGRESS, non-download messages
-        if (!output.startsWith('[INFO]') && 
-            !output.includes('[PROGRESS]') && 
-            !output.startsWith('[download]')) {
-          console.log(`[PYTHON] ${output}`);
-        }
+        console.error('[PYTHON STDERR]', output);
       }
     });
 
@@ -356,7 +305,6 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
     });
   });
 }
-
 
 // --- IPC HANDLERS ---
 function registerIPCHandlers() {
@@ -375,19 +323,15 @@ function registerIPCHandlers() {
     }
   });
 
-  // Handler per download:youtube
   ipcMain.handle("download:youtube", async (_event, { url, options }: { url: string; options: DownloadOptions }): Promise<DownloadResult> => {
     return runDownloadScript(url, options);
   });
 
-  // Nuova funzione convert-youtube che usa la stessa logica
   ipcMain.handle("convert-youtube", async (_event, query: string, options: DownloadOptions = {}) => {
-    // Utilizza direttamente la funzione ausiliaria
     const result = await runDownloadScript(query, options);
     return result;
   });
 
-  // Nuovi handlers per i controlli finestra
   ipcMain.on("window:minimize", () => {
     console.log("main: window:minimize received");
     if (mainWindow) mainWindow.minimize();
@@ -408,7 +352,6 @@ function registerIPCHandlers() {
     if (mainWindow) mainWindow.close();
   });
 }
-
 
 // --- APP LIFECYCLE ---
 app.whenReady().then(() => {

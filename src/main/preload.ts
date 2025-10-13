@@ -30,10 +30,10 @@ const electronAPI: ElectronAPI = {
   downloadYoutube: (url: string, options: DownloadOptions): Promise<DownloadResult> => {
     return ipcRenderer.invoke('download:youtube', { url, options });
   },
-  onDownloadProgress: (callback: (event: IpcRendererEvent, progress: DownloadProgress) => void): void => {
+  onDownloadProgress: (callback: (event: IpcRendererEvent, progress: Partial<DownloadProgress> & Record<string, unknown>) => void): void => {
     ipcRenderer.on('download-progress', callback);
   },
-  removeProgressListener: (callback: (event: IpcRendererEvent, progress: DownloadProgress) => void): void => {
+  removeProgressListener: (callback: (event: IpcRendererEvent, progress: Partial<DownloadProgress> & Record<string, unknown>) => void): void => {
     ipcRenderer.removeListener('download-progress', callback);
   },
   convertYoutube: (query: string, options: DownloadOptions = {}) => {
