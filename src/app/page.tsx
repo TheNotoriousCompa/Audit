@@ -1,8 +1,10 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import ParticlesBackground from "@/components/background";
+import Footer from '@/components/sections/Footer';
+import Background from "@/components/background";
 import DownloadProgressComponent from "@/components/DownloadProgress";
 import { Settings, Download, FolderOpen, FileSpreadsheet, FileText, Minus, Square, X } from "lucide-react";
+import AdvancedOptions from '@/components/sections/AdvancedOptions';
 import type { DownloadProgress, DownloadStatus } from '@/types/electron';
 
 export default function Home() {
@@ -353,15 +355,13 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen overflow-hidden">
-      <ParticlesBackground />
+      <Background />
       
       {/* Draggable Header with Native Window Controls */}
       <div 
-        className="absolute top-0 left-0 right-0 h-10 flex items-center justify-between px-4 bg-transparent z-50"
+        className="absolute top-0 left-0 right-0 h-10 flex items-center justify-end px-4 bg-transparent z-50"
         style={{ WebkitAppRegion: 'drag' }}
       >
-        <div className="text-sm text-gray-400">MP3 Downloader</div>
-        
         {/* Window Controls - Not draggable */}
         <div style={{ WebkitAppRegion: 'no-drag' }} className="flex items-center space-x-2">
         <button 
@@ -400,7 +400,7 @@ export default function Home() {
           <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
 
-        <div className="w-full max-w-3xl bg-gray-900/60 backdrop-blur-xs rounded-2xl p-4 sm:p-6 md:p-8 shadow-2xl border border-gray-700/50 mx-2 sm:mx-4">
+        <div className="w-full max-w-3xl bg-black/30 backdrop-blur-md rounded-2xl p-4 sm:p-6 md:p-8 shadow-2xl border border-gray-800/50 mx-2 sm:mx-4">
           <div className="space-y-4 w-full">
             <div className="flex gap-2 w-full">
               <div className="flex-1">
@@ -409,7 +409,7 @@ export default function Home() {
                   placeholder="Paste YouTube link or 'Artist - Song Name'..."
                   value={url}
                   onChange={e => setUrl(e.target.value)}
-                  className="w-full px-4 py-3 sm:px-5 sm:py-4 text-sm sm:text-base bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-100 placeholder-gray-500 transition-all duration-200"
+                  className="w-full px-4 py-3 sm:px-5 sm:py-4 text-sm sm:text-base bg-black/30 backdrop-blur-sm border border-gray-800/50 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none text-gray-100 placeholder-gray-400 transition-all duration-200"
                   disabled={loading}
                 />
               </div>
@@ -432,14 +432,14 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-3">
               <button 
                 onClick={handleSelectFolder}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-gray-800/50 hover:bg-gray-700/70 border border-gray-700 rounded-xl text-gray-200 hover:text-white transition-colors duration-200 font-medium text-xs sm:text-sm"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-black/30 hover:bg-black/50 backdrop-blur-sm border border-gray-800/50 rounded-xl text-gray-200 hover:text-white transition-colors duration-200 font-medium text-xs sm:text-sm"
               >
                 <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="truncate">{outputFolder ? `Output: ${outputFolder.split('\\').pop()?.split('/').pop() || 'Selected'}` : "Choose Folder"}</span>
               </button>
               <button 
                 onClick={() => csvInputRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 rounded-xl text-blue-200 hover:text-white transition-colors duration-200 font-medium text-xs sm:text-sm"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-emerald-600/30 hover:bg-emerald-600/50 border border-green-500/50 rounded-xl text-blue-200 hover:text-white transition-colors duration-200 font-medium text-xs sm:text-sm"
                 disabled={loading}
               >
                 <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -456,7 +456,7 @@ export default function Home() {
               </button>
               <button 
                 onClick={() => txtInputRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-green-600/30 hover:bg-green-600/50 border border-green-500/50 rounded-xl text-green-200 hover:text-white transition-colors duration-200 font-medium text-xs sm:text-sm"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 rounded-xl text-green-200 hover:text-white transition-colors duration-200 font-medium text-xs sm:text-sm"
                 disabled={loading}
               >
                 <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -499,71 +499,17 @@ export default function Home() {
             </div>
 
             {/* Advanced Options */}
-            {showAdvanced && (
-              <div className="mt-4 p-4 bg-gray-800/30 rounded-xl border border-gray-700/50 space-y-4">
-                <h3 className="text-sm font-medium text-gray-300">Advanced Options</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Format
-                      </label>
-                      <select
-                        value={format}
-                        onChange={(e) => setFormat(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white"
-                      >
-                        <option value="mp3">MP3 (Best compatibility)</option>
-                        <option value="m4a">M4A (AAC)</option>
-                        <option value="flac">FLAC (Lossless)</option>
-                        <option value="wav">WAV (Uncompressed)</option>
-                        <option value="opus">Opus (Efficient)</option>
-                        <option value="best">Best Available</option>
-                      </select>
-                    </div>
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Bitrate (kbps)
-                      </label>
-                      <select
-                        value={bitrate}
-                        onChange={(e) => setBitrate(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white"
-                        disabled={!['mp3', 'opus'].includes(format)}
-                      >
-                        <option value="128">128 kbps</option>
-                        <option value="192">192 kbps</option>
-                        <option value="256">256 kbps</option>
-                        <option value="320">320 kbps (Best)</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm text-gray-400">Timeout (seconds)</label>
-                    <input
-                      type="number"
-                      value={timeout}
-                      onChange={(e) => setTimeoutVal(Number(e.target.value))}
-                      min="30"
-                      step="30"
-                      className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="skipExisting"
-                    checked={skipExisting}
-                    onChange={(e) => setSkipExisting(e.target.checked)}
-                    className="h-4 w-4 text-blue-500 rounded border-gray-600 bg-gray-700 focus:ring-blue-500"
-                  />
-                  <label htmlFor="skipExisting" className="ml-2 text-xs sm:text-sm text-gray-300">
-                    Skip existing files
-                  </label>
-                </div>
-              </div>
-            )}
+            <AdvancedOptions
+              show={showAdvanced}
+              format={format}
+              setFormat={setFormat}
+              bitrate={bitrate}
+              setBitrate={setBitrate}
+              timeout={timeout}
+              setTimeout={setTimeoutVal}
+              skipExisting={skipExisting}
+              setSkipExisting={setSkipExisting}
+            />
 
             {/* Progress Bar - Always show if there's any progress data */}
             <div className="w-full mt-6">
@@ -588,34 +534,10 @@ export default function Home() {
                 </div>
               )}
             </div>
-
-            {/* Footer */}
-            <div className="mt-8 text-center text-sm text-gray-500">
-              <div className="inline-grid grid-cols-2 gap-x-8 gap-y-2 text-left">
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                  <span>MP3 up to 320kbps</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 mr-2"></div>
-                  <span>Playlist support</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-purple-500 mr-2"></div>
-                  <span>Batch processing</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></div>
-                  <span>Cross-platform</span>
-                </div>
-              </div>
-            </div>
+            <Footer />
           </div>
         </div>
       </div>
-      <footer className="mt-8 text-center text-sm text-gray-500">
-        Made by <span className="text-emerald-500"></span>MC<span className="text-emerald-500">/</span>
-      </footer>
     </main>
   );
 }

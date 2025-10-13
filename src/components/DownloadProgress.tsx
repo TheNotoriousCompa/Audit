@@ -166,7 +166,7 @@ const DownloadProgress: React.FC<DownloadProgressProps> = ({ progress = {}, clas
   }
 
   return (
-    <div className={`w-full space-y-3 p-4 bg-gray-800/30 rounded-lg border border-gray-700/50 ${className}`}>
+    <div className={`w-full space-y-3 p-4 bg-black-800/30 rounded-lg ${className}`}>
       {/* Success notification */}
       {showSuccess && (
         <div className="mb-3 p-2 bg-green-500/20 border border-green-500/50 rounded text-sm text-green-200">
