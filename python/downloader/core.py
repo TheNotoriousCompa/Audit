@@ -1,3 +1,15 @@
+# core.py
+"""
+Core download functionality for YouTube to MP3 converter.
+
+This module handles the actual downloading, conversion, and metadata setting
+using yt-dlp and external tools like FFmpeg.
+
+Dependencies:
+- yt-dlp
+- mutagen (for metadata)
+- requests (for artwork download)
+"""
 import os
 import logging
 import subprocess
@@ -6,8 +18,8 @@ from typing import Optional, Callable, Tuple, Any
 
 import yt_dlp
 
-from . import config
-from .postprocess import set_mp3_metadata as postprocess
+# Importa le funzioni necessarie dal modulo postprocess
+from .postprocess import set_mp3_metadata, download_artwork
 from .utils import ensure_directory, sanitize_filename
 
 logger = logging.getLogger(__name__)
@@ -60,6 +72,73 @@ def check_ffmpeg():
     logger.info("or place ffmpeg.exe in the same directory as this script")
     return None
 
+def _process_metadata(file_path: Path, info: dict, progress_callback: Optional[Callable] = None):
+    """Process metadata for a downloaded file."""
+    try:
+        # Get the best available thumbnail
+        thumbnail_url = None
+        
+        # 1. First try to get the thumbnail from the entry's metadata (for playlist items)
+        if info.get('thumbnail'):
+            thumbnail_url = info['thumbnail']
+        # 2. Try to get the highest resolution thumbnail from thumbnails list
+        elif 'thumbnails' in info and info['thumbnails']:
+            # Filter out thumbnails without URL and sort by resolution (highest first)
+            valid_thumbnails = [t for t in info['thumbnails'] if t.get('url')]
+            if valid_thumbnails:
+                # Sort by resolution (width * height), highest first
+                valid_thumbnails.sort(
+                    key=lambda x: x.get('width', 0) * x.get('height', 0),
+                    reverse=True
+                )
+                thumbnail_url = valid_thumbnails[0]['url']
+        
+        # 3. For playlist items, try to get the thumbnail from the parent playlist
+        if not thumbnail_url and 'playlist_index' in info and 'playlist' in info and info['playlist']:
+            for entry in info['playlist']:
+                if isinstance(entry, dict) and entry.get('id') == info.get('id') and entry.get('thumbnail'):
+                    thumbnail_url = entry['thumbnail']
+                    break
+                    
+        # 4. For playlists, try to get the thumbnail from the first entry
+        if not thumbnail_url and 'entries' in info and info['entries']:
+            for entry in info['entries']:
+                if isinstance(entry, dict) and entry.get('thumbnail'):
+                    thumbnail_url = entry['thumbnail']
+                    break
+        
+        # 5. Fall back to standard thumbnail if no thumbnails list or no valid thumbnails
+        if not thumbnail_url and 'thumbnail' in info and info['thumbnail']:
+            thumbnail_url = info['thumbnail']
+        
+        # 6. Try to get from 'thumbnail_url' if still no thumbnail
+        if not thumbnail_url and 'thumbnail_url' in info and info['thumbnail_url']:
+            thumbnail_url = info['thumbnail_url']
+        
+        # Download artwork if available
+        artwork = None
+        if thumbnail_url:
+            try:
+                artwork = download_artwork(thumbnail_url)
+            except Exception:
+                pass
+        
+        # Process metadata with all available info
+        set_mp3_metadata(
+            file_path=file_path,
+            title=info.get('title', ''),
+            artist=info.get('uploader', ''),
+            album=info.get('album', ''),
+            album_artist=info.get('artist', info.get('uploader', '')),
+            track_number=int(info.get('track_number', 0)) if info.get('track_number') else 0,
+            year=str(info.get('release_year') or info.get('release_date', '')[:4] if info.get('release_date') else ''),
+            genre=', '.join(info.get('genres', [])) if info.get('genres') else '',
+            artwork=artwork,
+            comment=f"Downloaded with yt-dlp from {info.get('webpage_url', '')}"
+        )
+    except Exception:
+        # Continue execution even if metadata processing fails
+        pass
 
 def download_media(
     url: str,
@@ -75,11 +154,7 @@ def download_media(
     Scarica media da YouTube (singolo video o playlist) e li converte nel formato desiderato.
     """
     ensure_directory(output_dir)
-    logger.info(f"Starting download: {url}")
-    logger.info(f"Output directory: {output_dir}")
-    logger.info(f"Process as playlist: {process_playlist}")
 
-    # Check if FFmpeg is installed
     ffmpeg_path = check_ffmpeg()
     if not ffmpeg_path:
         error_msg = (
@@ -90,7 +165,6 @@ def download_media(
             "1. Aggiungi la cartella 'bin' di FFmpeg al tuo PATH di sistema, OPPURE\n"
             "2. Copia ffmpeg.exe nella stessa cartella di questo programma"
         )
-        logger.error(error_msg)
         if progress_callback:
             progress_callback({"status": "error", "message": error_msg})
         return False, None, error_msg
@@ -104,111 +178,142 @@ def download_media(
         "outtmpl": str(Path(output_dir) / "%(title)s.%(ext)s"),
         "noplaylist": not process_playlist,
         "progress_hooks": [lambda d: _on_progress(d, progress_callback)],
-        # Only add post-processor if we have FFmpeg
         "postprocessors": [],
     }
     
-    # If we have FFmpeg, add audio conversion
     if ffmpeg_path:
         ydl_opts["postprocessors"].append({
             "key": "FFmpegExtractAudio",
             "preferredcodec": format,
             "preferredquality": str(bitrate),
         })
-        ydl_opts["ffmpeg_location"] = str(Path(ffmpeg_path).parent)  # Set FFmpeg directory
+        ydl_opts["ffmpeg_location"] = str(Path(ffmpeg_path).parent)
     else:
-        logger.warning("FFmpeg not found, downloading best audio format without conversion")
-        ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio"  # Try to get m4a which is widely supported
+        ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio"
 
     output_path = None
-    entries = []  # dichiarazione preventiva per evitare UnboundLocalError
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             
             if info is None:
-                logger.error("Impossibile scaricare: nessuna informazione ottenuta da yt-dlp.")
                 return False, None, "Impossibile scaricare il media"
 
             # Playlist
             if "entries" in info and info["entries"]:
                 entries = info["entries"]
-                logger.info(f"Playlist rilevata: {len(entries)} elementi.")
                 output_path = Path(output_dir)
+                
+                # Process playlist files
+                for entry in entries:
+                    if not entry:
+                        continue
+                        
+                    # Get the downloaded file path
+                    if '_filename' in entry:
+                        downloaded_file = Path(entry['_filename'])
+                    elif 'requested_downloads' in entry and entry['requested_downloads']:
+                        downloaded_file = Path(entry['requested_downloads'][0]['filepath'])
+                    else:
+                        logger.warning(f"Could not determine file path for entry: {entry.get('title', 'Unknown')}")
+                        continue
+                    
+                    if not downloaded_file.exists():
+                        logger.warning(f"File not found: {downloaded_file}")
+                        continue
+                    
+                    # Rename the file using the video title
+                    title = entry.get('title', 'Unknown Title')
+                    new_name = sanitize_filename(title) + downloaded_file.suffix
+                    new_path = downloaded_file.parent / new_name
+                    
+                    try:
+                        # If the target file exists, remove it first
+                        if new_path.exists():
+                            new_path.unlink()
+                        
+                        # Rename the file
+                        downloaded_file.rename(new_path)
+                        downloaded_file = new_path
+                        
+                        # Process metadata and add cover art
+                        if format.lower() == 'mp3' and downloaded_file.suffix.lower() == '.mp3':
+                            # Ensure we have all necessary metadata
+                            if 'webpage_url' not in entry and 'url' in info:
+                                entry['webpage_url'] = info['url']
+                            if 'uploader' not in entry and 'uploader' in info:
+                                entry['uploader'] = info['uploader']
+                                
+                            _process_metadata(downloaded_file, entry, progress_callback)
+                            logger.info(f"Processed metadata for: {downloaded_file.name}")
+                            
+                    except Exception as e:
+                        logger.error(f"Error processing {downloaded_file}: {str(e)}", exc_info=True)
             else:
                 # Singolo video
-                filename = sanitize_filename(info.get("title", "unknown"))
-                ext = info.get("ext", format)
-                output_path = Path(output_dir) / f"{filename}.{ext}"
-
-            logger.info(f"Successfully downloaded: {output_path}")
-
-            # Post-processing - Set metadata if this is an MP3 file
-            if format.lower() == 'mp3' and output_path.suffix.lower() == '.mp3':
-                try:
-                    logger.info("[DEBUG] Starting post-processing for MP3 file")
+                if 'requested_downloads' in info and info['requested_downloads']:
+                    # Get the first (and usually only) download
+                    download_info = info['requested_downloads'][0]
+                    downloaded_file = Path(download_info['filepath']).resolve()
                     
-                    # Get the best available thumbnail
-                    thumbnail_url = None
+                    # Post-processing per il file singolo
+                    if format.lower() == 'mp3' and (downloaded_file.suffix.lower() == '.mp3' or 
+                                                 (hasattr(download_info, 'ext') and download_info.ext.lower() == 'mp3')):
+                        _process_metadata(downloaded_file, info, progress_callback)
                     
-                    # Try to get the highest resolution thumbnail
-                    if 'thumbnails' in info and info['thumbnails']:
-                        # Sort by resolution (width * height), highest first
-                        thumbnails = sorted(
-                            [t for t in info['thumbnails'] if t.get('url')],
-                            key=lambda x: x.get('width', 0) * x.get('height', 0),
-                            reverse=True
-                        )
-                        if thumbnails:
-                            thumbnail_url = thumbnails[0]['url']
+                    # Determina il nome finale del file
+                    title = info.get('title', 'Unknown Title')
+                    ext = 'mp3' if format.lower() == 'mp3' else download_info.get('ext', format)
+                    output_path = Path(output_dir) / f"{sanitize_filename(title)}.{ext}"
                     
-                    # Fall back to standard thumbnail if no thumbnails list
-                    if not thumbnail_url and 'thumbnail' in info:
-                        thumbnail_url = info['thumbnail']
-                    
-                    artwork = None
-                    if thumbnail_url:
-                        logger.info(f"[DEBUG] Found thumbnail URL: {thumbnail_url}")
+                    # Se il file è stato convertito, rinominalo
+                    if downloaded_file.exists():
                         try:
-                            artwork = download_artwork(thumbnail_url)
-                            if artwork:
-                                logger.info(f"[DEBUG] Successfully downloaded artwork ({len(artwork)} bytes)")
-                            else:
-                                logger.warning("[DEBUG] Downloaded artwork is empty")
-                        except Exception as e:
-                            logger.error(f"[DEBUG] Error downloading artwork: {str(e)}")
+                            # Ensure the output directory exists
+                            output_path.parent.mkdir(parents=True, exist_ok=True)
+                            
+                            # If the file is not already in the final location, move it
+                            if downloaded_file != output_path:
+                                if output_path.exists():
+                                    output_path.unlink()
+                                downloaded_file.rename(output_path)
+                        except Exception:
+                            # If moving fails, use the original downloaded file path
+                            output_path = downloaded_file
                     else:
-                        logger.warning("[DEBUG] No thumbnail URL found in video info")
-                    
-                    # Process metadata
-                    logger.info("[DEBUG] Setting MP3 metadata...")
-                    postprocess(
-                        file_path=output_path,
-                        title=info.get('title', ''),
-                        artist=info.get('uploader', ''),
-                        album=info.get('album', ''),
-                        artwork=artwork
-                    )
-                    logger.info("[DEBUG] Metadata processing completed successfully")
-                    
-                except Exception as e:
-                    logger.exception(f"[ERROR] Metadata processing failed: {str(e)}")
-                    if progress_callback:
-                        progress_callback({
-                            'status': 'warning',
-                            'message': f'Warning: Metadata processing failed: {str(e)}'
-                        })
+                        return False, None, "Il file scaricato non è stato trovato"
+                else:
+                    return False, None, "Impossibile determinare il percorso del file scaricato"
 
-            return True, output_path, "Download completato con successo"
+            if output_path and isinstance(output_path, (str, Path)):
+                output_path = Path(output_path).resolve()
+                if output_path.exists():
+                    return True, str(output_path), "Download completato con successo"
+                else:
+                    # If the file doesn't exist at the expected path, try to find it in the output directory
+                    title = info.get('title', 'Unknown Title')
+                    search_pattern = f"{sanitize_filename(title)}.*"
+                    matching_files = list(Path(output_dir).glob(search_pattern))
+                    if matching_files:
+                        return True, str(matching_files[0].resolve()), "Download completato con successo"
+                    return False, None, f"File non trovato nel percorso: {output_path}"
+            else:
+                # Try to get the output path from the info dict
+                if 'requested_downloads' in info and info['requested_downloads']:
+                    filepath = info['requested_downloads'][0].get('filepath')
+                    if filepath and Path(filepath).exists():
+                        return True, str(Path(filepath).resolve()), "Download completato con successo"
+                return False, None, "Impossibile determinare il percorso del file scaricato"
 
     except yt_dlp.utils.DownloadError as e:
-        logger.error(f"Errore durante il download: {str(e)}")
-        return False, None, f"Errore durante il download: {str(e)}"
+        error_msg = str(e)
+        logger.error(f"Download error: {error_msg}")
+        return False, None, f"Errore durante il download: {error_msg}"
     except Exception as e:
-        logger.exception("Errore imprevisto durante il download")
-        return False, None, f"Errore imprevisto: {str(e)}"
-
+        error_msg = str(e)
+        logger.exception(f"Unexpected error: {error_msg}")
+        return False, None, f"Errore imprevisto: {error_msg}"
 
 def _on_progress(d: dict[str, Any], callback: Optional[Callable] = None) -> None:
     """Callback di progresso per yt-dlp.
@@ -235,7 +340,27 @@ def _on_progress(d: dict[str, Any], callback: Optional[Callable] = None) -> None
                 percent_str = f"{percent:.1f}%"
             else:
                 percent_str = "0%"
+        
+        # Get current ETA in seconds
+        current_eta = d.get('eta', 0)
+        
+        # Calculate total playlist ETA if this is part of a playlist
+        total_playlist_eta = 0
+        if d.get('playlist_index') is not None and d.get('playlist_count') is not None:
+            current_index = d.get('playlist_index', 1)
+            total_songs = d.get('playlist_count', 1)
+            remaining_songs = total_songs - current_index
+            
+            # Calculate remaining time for current song (scaled by progress)
+            current_progress = float(percent_str.rstrip('%')) / 100.0
+            if current_progress > 0 and current_progress < 1:
+                remaining_current_song = current_eta * (1 - current_progress)
+            else:
+                remaining_current_song = current_eta
                 
+            # Calculate total remaining time (current song + remaining songs)
+            total_playlist_eta = remaining_current_song + (remaining_songs * current_eta)
+        
         # Format progress data to match what the frontend expects
         progress_info = {
             'status': status,
@@ -246,9 +371,12 @@ def _on_progress(d: dict[str, Any], callback: Optional[Callable] = None) -> None
             '_speed_str': d.get('_speed_str', '0 B/s'),
             '_eta_str': d.get('_eta_str', '--:--'),
             'filename': d.get('filename', ''),
-            'eta': d.get('eta', 0),  # Add numeric ETA in seconds
+            'eta': current_eta,  # Current song ETA in seconds
+            'total_playlist_eta': int(total_playlist_eta) if total_playlist_eta > 0 else 0,  # Total playlist ETA in seconds
             'speed': d.get('speed', 0),  # Add numeric speed in bytes/s
-            'is_playlist': bool(d.get('playlist_index') is not None)
+            'is_playlist': bool(d.get('playlist_index') is not None),
+            'playlist_index': d.get('playlist_index'),
+            'playlist_count': d.get('playlist_count')
         }
         
         # Special handling for finished status

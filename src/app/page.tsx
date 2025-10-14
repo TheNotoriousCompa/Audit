@@ -43,6 +43,40 @@ export default function Home() {
   const [processPlaylist, setProcessPlaylist] = useState(false);
   const [isPlaylist, setIsPlaylist] = useState(false);
 
+  // Reset to ready state after 7 seconds of completion
+  useEffect(() => {
+    if (progress.status === 'finished' || progress.status === 'error') {
+      const timer = setTimeout(() => {
+        setProgress(prev => ({
+          ...prev,
+          status: 'ready',
+          message: '',
+          percentage: 0,
+          downloaded: 0,
+          total: 0,
+          speed: 0,
+          speed_str: '0 B/s',
+          eta: 0,
+          _percent_str: '0%',
+          _eta_str: '--:--',
+          downloaded_bytes: 0,
+          total_bytes: 0,
+          currentItem: 0,
+          totalItems: 0,
+          currentFile: '',
+          isPlaylist: false,
+          filename: '',
+          speed_raw: 0,
+          timestamp: Date.now()
+        }));
+        setResult(null);
+        setError(null);
+      }, 7000); // 7 seconds delay
+
+      return () => clearTimeout(timer);
+    }
+  }, [progress.status]);
+
   // Register progress listener from Python script
   useEffect(() => {
     if (typeof window !== 'undefined' && window.electronAPI?.onDownloadProgress) {
