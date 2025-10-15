@@ -2,7 +2,7 @@
 
 <p id="description">A ytdpl wrap with a lot of features and a fresh aesthetic made to practice with electron.</p>
 
-<h2>🛠️ Installation Steps:</h2>
+<h2>🛠️ Installation and usage steps:</h2>
 
 <p>1. Install of the dependencies</p>
 
