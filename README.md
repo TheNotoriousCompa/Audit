@@ -1,11 +1,13 @@
-# YouTube to MP3 Converter
+# Audit
 
-A lightweight desktop application that lets you download high-quality MP3 audio from YouTube videos. Built with Electron, React, and TypeScript, with yt-dlp for reliable YouTube downloads.
+A lightweight desktop application that lets you download high-quality MP3 audio from YouTube videos. Built with Electron, React, and TypeScript, with yt-dlp for reliable YouTube downloads and with a lot of features and a fresh aesthetic made to practice with a lot of tools.
 
 ## Features
 
-- Download YouTube videos as high-quality MP3 files
+- Download YouTube videos as high-quality audio format files
 - Simple and intuitive user interface
+- Playlist support
+- Customizable aesthetic
 - Fast downloads with progress tracking
 - Cross-platform support (Windows, macOS, Linux)
 - No file size limits
