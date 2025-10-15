@@ -78,10 +78,6 @@ ytmp3-next/
 └── scripts/                # Build utilities
 ```
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Disclaimer
 
 This application is for personal use only. Please respect YouTube's terms of service and only download content you have the rights to.
