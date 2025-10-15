@@ -1,87 +1,51 @@
-# YouTube to MP3 Converter
+<h1 align="center" id="title">Audit</h1>
 
-A lightweight desktop application that lets you download high-quality MP3 audio from YouTube videos. Built with Electron, React, and TypeScript, with yt-dlp for reliable YouTube downloads.
+<p id="description">A ytdpl wrap with a lot of features and a fresh aesthetic made to practice with electron.</p>
 
-## Features
+<h2>🛠️ Installation and usage steps:</h2>
 
-- Download YouTube videos as high-quality MP3 files
-- Simple and intuitive user interface
-- Fast downloads with progress tracking
-- Cross-platform support (Windows, macOS, Linux)
-- No file size limits
-
-## Prerequisites
-
-- Node.js 16.x or later
-- npm or yarn
-- Python 3.7+ (for yt-dlp)
-- FFmpeg (for audio conversion)
-
-## Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/TheNotoriousCompa/ytmp3-next.git
-   cd ytmp3-next
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   # or
-   yarn
-   ```
-
-3. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-1. Start the application:
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
-
-2. Copy and paste a YouTube URL into the input field
-3. Click "Download" and choose a save location
-4. Wait for the conversion to complete
-
-## Building for Production
-
-To create a standalone application:
+<p>1. Clone the repository and install dependencies</p>
 
 ```bash
-# Build the application
+# Clone the repository
+git clone https://github.com/yourusername/audit.git
+cd audit
+
+# Install Node.js dependencies
+npm install
+# or
+yarn
+
+# Install Python dependencies
+pip install yt-dlp>=2023.3.4 mutagen>=1.45.1 Pillow>=9.0.0 requests>=2.27.1
+```
+
+2. Start the application
+
+```bash
+# Development mode
+npm run dev
+# or
+yarn dev
+
+# Build for production
 npm run build
 # or
 yarn build
-
-# Package for your platform
-npm run package
-# or
-yarn package
 ```
 
-## Project Structure
+<h2>🍰 Contribution Guidelines:</h2>
 
-```
-ytmp3-next/
-├── src/                    # Source files
-│   ├── main/               # Electron main process
-│   ├── renderer/           # React frontend
-│   └── types/              # TypeScript definitions
-├── python/                 # yt-dlp wrapper and FFmpeg
-└── scripts/                # Build utilities
-```
+You can do whatever you want with this code! 
 
-## License
+  
+  
+<h2>💻 Built with</h2>
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Technologies used in the project:
 
-## Disclaimer
+*   Electron
+*   Next
+*   Typescript
+*   Python
 
-This application is for personal use only. Please respect YouTube's terms of service and only download content you have the rights to.

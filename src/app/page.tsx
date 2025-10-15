@@ -3,8 +3,9 @@ import React, { useState, useEffect } from "react";
 import Footer from '@/components/sections/Footer';
 import Background from "@/components/background";
 import DownloadProgressComponent from "@/components/DownloadProgress";
-import { Settings, Download, FolderOpen, FileSpreadsheet, FileText, Minus, Square, X } from "lucide-react";
+import { Settings, Download, FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Palette } from "lucide-react";
 import AdvancedOptions from '@/components/sections/AdvancedOptions';
+import Personalize from '@/components/sections/Personalize';
 import type { DownloadProgress, DownloadStatus } from '@/types/electron';
 
 export default function Home() {
@@ -18,6 +19,24 @@ export default function Home() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [skipExisting, setSkipExisting] = useState(true);
   const [timeout, setTimeoutVal] = useState(300);
+  const [showPersonalize, setShowPersonalize] = useState(false);
+  // Load colors from localStorage on component mount
+  const [colors, setColors] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedColors = localStorage.getItem('waveColors');
+      return savedColors 
+        ? JSON.parse(savedColors) 
+        : { lineColor: '#c2c1c0', backgroundColor: '#000000' };
+    }
+    return { lineColor: '#c2c1c0', backgroundColor: '#000000' };
+  });
+
+  // Save colors to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('waveColors', JSON.stringify(colors));
+    }
+  }, [colors]);
   const [progress, setProgress] = useState<DownloadProgress>({
     percentage: 0,
     downloaded: 0,
@@ -389,7 +408,10 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen overflow-hidden">
-      <Background />
+      <Background 
+        lineColor={colors.lineColor}
+        backgroundColor={colors.backgroundColor}
+      />
       
       {/* Draggable Header with Native Window Controls */}
       <div 
@@ -397,7 +419,27 @@ export default function Home() {
         style={{ WebkitAppRegion: 'drag' }}
       >
         {/* Window Controls - Not draggable */}
-        <div style={{ WebkitAppRegion: 'no-drag' }} className="flex items-center space-x-2">
+        <div style={{ WebkitAppRegion: 'no-drag' }} className="flex items-center space-x-4 pr-2">
+          <button
+            onClick={() => {
+              setShowPersonalize(!showPersonalize);
+              if (showAdvanced) setShowAdvanced(false);
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${showPersonalize ? 'bg-white/10' : 'hover:bg-white/5'}`}
+            title="Personalize"
+          >
+            <Palette className="w-5 h-5 text-gray-300" />
+          </button>
+          <button
+            onClick={() => {
+              setShowAdvanced(!showAdvanced);
+              if (showPersonalize) setShowPersonalize(false);
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${showAdvanced ? 'bg-white/10' : 'hover:bg-white/5'}`}
+            title="Settings"
+          >
+            <Settings className="w-5 h-5 text-gray-300" />
+          </button>
         <button 
           onClick={() => window.electronAPI?.windowMinimize?.()}
           className="p-1 text-gray-300 hover:text-white transition-colors"
@@ -423,17 +465,6 @@ export default function Home() {
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 pt-16">
-        {/* Settings Button */}
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className={`absolute top-12 right-4 sm:top-16 sm:right-6 p-3 rounded-full transition-all duration-200 ${
-            showAdvanced ? 'bg-black/1 text-white' : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/70 hover:text-white'
-          }`}
-          title="Settings"
-        >
-          <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
-        </button>
-
         <div className="w-full max-w-3xl bg-black/30 backdrop-blur-md rounded-2xl p-4 sm:p-6 md:p-8 shadow-2xl border border-gray-800/50 mx-2 sm:mx-4">
           <div className="space-y-4 w-full">
             <div className="flex gap-2 w-full">
@@ -543,6 +574,17 @@ export default function Home() {
               setTimeout={setTimeoutVal}
               skipExisting={skipExisting}
               setSkipExisting={setSkipExisting}
+            />
+            
+            <Personalize
+              show={showPersonalize}
+              onColorChange={(type, value) => {
+                setColors((prev: { lineColor: string; backgroundColor: string }) => ({
+                  ...prev,
+                  [type]: value
+                }));
+              }}
+              currentColors={colors}
             />
 
             {/* Progress Bar - Always show if there's any progress data */}
