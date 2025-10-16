@@ -557,7 +557,7 @@ export default function Home() {
                 ) : (
                   <>
                     <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span>{url.trim() ? 'Download MP3' : 'Process Imported Files'}</span>
+                    <span>{url.trim() ? 'Download' : 'Process Imported Files'}</span>
                   </>
                 )}
               </button>
