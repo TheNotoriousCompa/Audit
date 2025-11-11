@@ -159,18 +159,29 @@ const DownloadProgress: React.FC<DownloadProgressProps> = ({ progress = {}, clas
     }
   }, [status]);
 
-  // Don't show anything if there's no active download and no message
-  const shouldHide = !showSuccess && !message && (!status || status === ('idle' as DownloadStatus));
+  // Don't show anything if there's no active download, no message, and no error
+  const shouldHide = !showSuccess && !message && (!status || status === ('idle' as DownloadStatus)) && status !== 'error';
   if (shouldHide) {
     return null;
   }
 
   return (
     <div className={`w-full space-y-3 p-4 bg-black-800/30 rounded-lg ${className}`}>
-      {/* Success notification */}
-      {showSuccess && (
-        <div className="mb-3 p-2 bg-green-500/20 border border-green-500/50 rounded text-sm text-green-200">
-          {message || 'Download completed successfully!'}
+      {/* Success/Error notification */}
+      {(showSuccess || status === 'error') && (
+        <div className={`mb-3 p-3 rounded text-sm ${
+          status === 'error' 
+            ? 'bg-red-500/20 border border-red-500/50 text-red-200' 
+            : 'bg-green-500/20 border border-green-500/50 text-green-200'
+        }`}>
+          {status === 'error' ? (
+            <div className="space-y-2">
+              <div className="font-medium">Download Error</div>
+              <div>{message || 'An unknown error occurred during download'}</div>
+            </div>
+          ) : (
+            message || 'Download completed successfully!'
+          )}
         </div>
       )}
 
