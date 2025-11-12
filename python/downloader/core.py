@@ -195,22 +195,7 @@ def download_media(
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            try:
-                info = ydl.extract_info(url, download=True)
-            except Exception as e:
-                if 'HTTP Error 403' in str(e):
-                    error_msg = (
-                        "YouTube has blocked this request. This can happen due to temporary restrictions.\n\n"
-                        "Please try the following solutions:\n"
-                        "1. Try again in a few minutes\n"
-                        "2. Check if the video is available in your country\n"
-                        "3. If using a VPN, try disabling it or changing your location\n"
-                        "4. Wait for some time before trying again"
-                    )
-                    if progress_callback:
-                        progress_callback({"status": "error", "message": error_msg})
-                    return False, None, error_msg
-                raise  # Re-raise the exception if it's not a 403 error
+            info = ydl.extract_info(url, download=True)
             
             if info is None:
                 return False, None, "Impossibile scaricare il media"

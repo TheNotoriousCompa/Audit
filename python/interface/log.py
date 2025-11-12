@@ -86,13 +86,17 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
         status = data.get('status', 'ready')
         
         # Map Python yt-dlp status to our status types
-        if status == 'finished' or percentage >= 100:
+        if status == 'downloading':
+            status = 'downloading'
+        elif status == 'finished':
             status = 'finished'
             percentage = 100
-        elif status == 'downloading' or (percentage > 0 and percentage < 100):
-            status = 'downloading'
         elif status == 'error':
             status = 'error'
+        elif percentage > 0 and percentage < 100:
+            status = 'downloading'
+        elif percentage >= 100:
+            status = 'finished'
         else:
             status = 'ready'
         
@@ -110,17 +114,6 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
         elif data.get('currentFile'):
             current_file = str(data['currentFile'])
         
-        # Add playlist position info if available
-        playlist_info = ''
-        if data.get('is_playlist') and data.get('playlist_index') is not None and data.get('playlist_count') is not None:
-            current = data['playlist_index'] + 1  # Make it 1-based
-            total = data['playlist_count']
-            playlist_info = f" ({current}/{total})"
-            
-            # Update ETA string to include playlist info
-            if eta_str and eta_str != '--:--':
-                eta_str = f"{eta_str}{playlist_info}"
-        
         # Format the response to match TypeScript interface
         formatted = {
             'status': status,
@@ -131,13 +124,12 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
             'eta': eta,
             'message': str(data.get('message', '')),
             # Include raw values for compatibility
-            '_percent_str': f"{percentage}%{playlist_info}",
+            '_percent_str': f"{percentage}%",
             'downloaded_bytes': downloaded_bytes,
             'total_bytes': total_bytes,
             '_speed_str': speed_str,
             '_eta_str': eta_str,
-            'currentFile': current_file,
-            'playlist_info': playlist_info.strip()
+            'currentFile': current_file
         }
         
         return formatted
