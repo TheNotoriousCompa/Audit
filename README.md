@@ -1,117 +1,109 @@
 # Audit
 
-A lightweight desktop application that lets you download high-quality MP3 audio from YouTube videos. Built with Electron, React, and TypeScript, with yt-dlp for reliable YouTube downloads and with a lot of features and a fresh aesthetic made to practice with a lot of tools.
+A modern, standalone YouTube to MP3 converter built with Electron and Next.js.
 
 ## Features
 
-- Download YouTube videos as high-quality audio format files
-- Simple and intuitive user interface
-- Playlist support
-- Customizable aesthetic
-- Fast downloads with progress tracking
-- Cross-platform support (Windows, macOS, Linux)
-- No file size limits
-
-## Prerequisites
-
-- Node.js 16.x or later
-- npm or yarn
-- Python 3.7+ (for yt-dlp)
-- FFmpeg (for audio conversion)
+- **High-Quality Audio Conversion**: Download YouTube videos as MP3 files at up to 320kbps
+- **Playlist Support**: Download entire playlists with a single click
+- **Automatic Metadata**: Adds cover art and ID3 tags to downloaded files
+- **Fully Standalone**: No external dependencies required - Python and FFmpeg are bundled
+- **Auto-Updates**: Automatic updates via Squirrel installer
+- **Modern UI**: Clean, responsive interface built with Next.js and Tailwind CSS
 
 ## Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/TheNotoriousCompa/ytmp3-next.git
-   cd ytmp3-next
-   ```
+Download the latest `Audit-Setup.exe` from the [Releases](https://github.com/TheNotoriousCompa/Audit/releases) page and run it. The application will install automatically with no additional configuration required.
 
-2. Install dependencies:
-   ```bash
-   npm install
-   # or
-   yarn
-   ```
+## Development
 
-3. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Prerequisites
 
-## Usage
+- Node.js 18+ and npm
+- Git
 
-1. Start the application:
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
+### Setup
 
-2. Copy and paste a YouTube URL into the input field
-3. Click "Download" and choose a save location
-4. Wait for the conversion to complete
+```bash
+# Clone the repository
+git clone https://github.com/TheNotoriousCompa/Audit.git
+cd Audit
 
-## Building for Production
+# Install dependencies
+npm install
 
-To create a standalone application:
+# Run in development mode
+npm run dev
+```
+
+### Build
 
 ```bash
 # Build the application
 npm run build
-# or
-yarn build
 
-# Package for your platform
+# Package for distribution
 npm run package
-# or
-yarn package
+
+# Create installer
+npm run make
 ```
 
-## Troubleshooting
+The installer will be generated in `out/make/squirrel.windows/x64/`.
 
-### 403 Forbidden Error
+## Architecture
 
-If you encounter a `403 Forbidden` error when trying to download videos, try these solutions:
+### Tech Stack
 
-1. **Update yt-dlp**:
-   ```bash
-   pip install -U yt-dlp
-   ```
+- **Frontend**: Next.js 15, React 19, Tailwind CSS
+- **Backend**: Electron 28, Node.js
+- **Python Runtime**: Python 3.13 (bundled)
+- **Audio Processing**: FFmpeg 7.1 (bundled)
+- **Downloader**: yt-dlp
 
-2. **Use a VPN**: YouTube might be blocking your IP address. Try using a VPN to change your IP.
-
-3. **Clear yt-dlp cache**:
-   ```bash
-   yt-dlp --rm-cache-dir
-   ```
-
-4. **Try a different network**: If you're on a restricted network (like school or work), try using a different internet connection.
-
-5. **Update the application**: Make sure you're using the latest version of the application.
-
-6. **Check YouTube's status**: Sometimes YouTube might be experiencing issues. Check [YouTube's status page](https://www.youtube.com/status).
-
-7. **Temporarily disable security software**: Some antivirus or firewall settings might be interfering with the download process.
-
-If the issue persists, please open an issue on GitHub with the following information:
-- The URL you're trying to download
-- The exact error message
-- Your operating system version
-- The version of the application
-
-## Project Structure
+### Project Structure
 
 ```
-ytmp3-next/
-├── src/                    # Source files
-│   ├── main/               # Electron main process
-│   ├── renderer/           # React frontend
-│   └── types/              # TypeScript definitions
-├── python/                 # yt-dlp wrapper and FFmpeg
-└── scripts/                # Build utilities
+audit/
+├── src/
+│   ├── app/              # Next.js app directory
+│   ├── components/       # React components
+│   └── main/            # Electron main process
+├── python/              # Python backend scripts
+│   ├── downloader/      # Download and conversion logic
+│   └── interface/       # IPC communication
+├── setup-python.js      # Python runtime setup script
+├── setup-ffmpeg.js      # FFmpeg setup script
+└── forge.config.js      # Electron Forge configuration
 ```
 
-## Disclaimer
+## Bundled Dependencies
 
-This application is for personal use only. Please respect YouTube's terms of service and only download content you have the rights to.
+The application includes:
+
+- **Python 3.13.0**: Embeddable runtime with yt-dlp, mutagen, Pillow, and requests
+- **FFmpeg 7.1**: Audio conversion and processing
+
+These are automatically downloaded and configured during the build process via `prebuild` hooks.
+
+## Auto-Updates
+
+The application uses Squirrel.Windows for automatic updates. When a new version is released on GitHub, users will be notified and the update will be downloaded in the background. The update is applied on the next application restart.
+
+### Publishing Updates
+
+1. Update the `version` field in `package.json`
+2. Run `npm run make`
+3. Create a new release on GitHub with the version tag (e.g., `v0.2.0`)
+4. Upload these files from `out/make/squirrel.windows/x64/`:
+   - `Audit-Setup.exe`
+   - `RELEASES`
+   - `Audit-{version}-full.nupkg`
+
+## License
+
+MIT License
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
