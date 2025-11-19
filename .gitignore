@@ -108,6 +108,8 @@ ffmpeg/
 # Virtual Environment
 venv/
 ENV/
+python-runtime/
+ffmpeg/
 
 # IDE specific files
 .idea/

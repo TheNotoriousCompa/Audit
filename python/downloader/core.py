@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 def check_ffmpeg():
     """Check for FFmpeg in common locations and return the path if found."""
     possible_paths = [
+        # Check in app.asar.unpacked (where asar.unpack puts it)
+        Path(__file__).parent.parent.parent / "ffmpeg" / "bin" / "ffmpeg.exe",
+        # Check in bundled ffmpeg (for packaged app)
+        Path(__file__).parent.parent / "ffmpeg" / "bin" / "ffmpeg.exe",
         # Check in the same directory as the script
         Path(__file__).parent / "ffmpeg.exe",
         # Check in a subdirectory

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, autoUpdater } from "electron";
 import * as fs from 'fs';
 import path from "path";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
@@ -14,21 +14,51 @@ type PythonProcess = ChildProcessWithoutNullStreams & {
 
 let mainWindow: BrowserWindow | null = null;
 
+// Auto-updater configuration
+if (!isDev) {
+  const server = 'https://github.com';
+  const repo = 'YOUR_USERNAME/YOUR_REPO'; // TODO: Replace with your GitHub repo
+  const feed = `${server}/${repo}/releases/latest`;
+
+  autoUpdater.setFeedURL({ url: feed });
+
+  // Check for updates on startup (after 3 seconds)
+  setTimeout(() => {
+    autoUpdater.checkForUpdates();
+  }, 3000);
+
+  // Log update events
+  autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
+    console.log('Update downloaded:', releaseName);
+    // Optionally notify user
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Aggiornamento Disponibile',
+      message: `Versione ${releaseName} scaricata. L'app si aggiornerà al prossimo riavvio.`,
+      buttons: ['OK']
+    });
+  });
+
+  autoUpdater.on('error', (error) => {
+    console.error('Auto-updater error:', error);
+  });
+}
+
 // --- Function to create the main window ---
 function createWindow() {
   let preloadPath: string;
-  
+
   if (isDev) {
     preloadPath = path.join(__dirname, '..', '..', 'dist', 'preload', 'preload.js');
     console.log('Development preload path:', preloadPath);
   } else {
-    preloadPath = path.join(process.resourcesPath, 'app/dist/preload/preload.js');
+    preloadPath = path.join(process.resourcesPath, 'app.asar', 'dist', 'preload', 'preload.js');
   }
-  
+
   if (!path.isAbsolute(preloadPath)) {
     preloadPath = path.resolve(preloadPath);
   }
-  
+
   console.log('Final preload path:', preloadPath);
   console.log('preload file exists:', fs.existsSync(preloadPath));
 
@@ -53,19 +83,19 @@ function createWindow() {
 
   const url = isDev
     ? "http://localhost:3000"
-    : `file://${path.join(__dirname, "../../../out/index.html")}`;
+    : `file://${app.getAppPath()}/dist/renderer/index.html`;
 
   console.log("Loading URL:", url);
 
   const loadApp = (retryCount = 0) => {
     if (!mainWindow) return;
-    
+
     const maxRetries = 10;
     const retryDelay = 1000;
 
-    mainWindow.loadURL('http://localhost:3000').catch((err) => {
+    mainWindow.loadURL(url).catch((err) => {
       console.warn(`Failed to load URL (attempt ${retryCount + 1}/${maxRetries}):`, err);
-      
+
       if (retryCount < maxRetries) {
         console.log(`Retrying in ${retryDelay}ms...`);
         setTimeout(() => loadApp(retryCount + 1), retryDelay);
@@ -92,20 +122,34 @@ function createWindow() {
 // --- Function to run download script ---
 async function runDownloadScript(url: string, options: DownloadOptions): Promise<DownloadResult> {
   return new Promise((resolve) => {
-    const scriptPath = isDev
-      ? path.join(__dirname, "../../python/main.py")
-      : path.join(process.resourcesPath, "app/python/main.py");
+    let scriptPath: string;
+    let pythonExecutable: string;
+
+    if (isDev) {
+      scriptPath = path.join(__dirname, "../../python/main.py");
+      pythonExecutable = "python"; // Use system Python in dev
+    } else {
+      // Try extraResources first, then asar.unpacked
+      const extraResourcePath = path.join(process.resourcesPath, "python", "main.py");
+      const asarUnpackedPath = path.join(process.resourcesPath, "app.asar.unpacked", "python", "main.py");
+
+      scriptPath = fs.existsSync(extraResourcePath) ? extraResourcePath : asarUnpackedPath;
+
+      // Use bundled Python runtime
+      pythonExecutable = path.join(process.resourcesPath, "python-runtime", "python.exe");
+    }
 
     console.log("🔧 Running Python script:", scriptPath);
+    console.log("🐍 Using Python:", pythonExecutable);
 
     // Ensure output directory exists and is writable
     if (options.outputDir) {
       try {
         const outputDir = path.resolve(options.outputDir);
         console.log(`Ensuring output directory exists: ${outputDir}`);
-        
+
         fs.mkdirSync(outputDir, { recursive: true });
-        
+
         try {
           const testFile = path.join(outputDir, '.write-test');
           fs.writeFileSync(testFile, 'test');
@@ -118,7 +162,7 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
             error: `Output directory is not writable: ${outputDir}`
           });
         }
-        
+
         options.outputDir = outputDir;
       } catch (err: unknown) {
         console.error('Failed to create output directory:', err);
@@ -135,9 +179,9 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
 
     const args = [scriptPath];
     args.push(url);
-    
+
     const outputDir = path.normalize(options.outputDir || process.cwd());
-    
+
     try {
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
@@ -155,39 +199,39 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
     }
 
     args.push(outputDir);
-    
+
     if (options.format) args.push('--format', options.format);
     if (options.quality) args.push('--quality', options.quality);
     if (options.processPlaylist) args.push('--process-playlist');
-    
-    console.log('Using output directory:', outputDir);
-    console.log('Running command:', 'python', args.join(' '));
 
-    const pythonProcess: PythonProcess = spawn('python', args, {
+    console.log('Using output directory:', outputDir);
+    console.log('Running command:', pythonExecutable, args.join(' '));
+
+    const pythonProcess: PythonProcess = spawn(pythonExecutable, args, {
       stdio: ['pipe', 'pipe', 'pipe']
     }) as PythonProcess;
 
     let stdoutBuffer = '';
-    
+
     pythonProcess.stdout.on('data', (data: Buffer) => {
       const output = data.toString();
       if (!output) return;
-      
+
       stdoutBuffer += output;
-      
+
       const lines = stdoutBuffer.split('\n');
       stdoutBuffer = lines.pop() || '';
-      
+
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || !trimmed.startsWith('{')) continue;
-        
+
         try {
           const parsed = JSON.parse(trimmed);
-          
+
           if (parsed.type === 'progress' && parsed.data) {
             const progressData = parsed.data;
-            
+
             const safeProgress = {
               status: String(progressData.status || 'downloading'),
               percentage: Number(progressData.percentage || 0),
@@ -199,22 +243,22 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
               _percent_str: String(progressData._percent_str || '0%'),
               _speed_str: String(progressData._speed_str || '0 B/s'),
               _eta_str: String(progressData._eta_str || '--:--'),
-              filename: progressData.filename 
-                ? String(progressData.filename).split(/[/\\]/).pop() 
+              filename: progressData.filename
+                ? String(progressData.filename).split(/[/\\]/).pop()
                 : (progressData.currentFile ? String(progressData.currentFile) : ''),
-              currentFile: progressData.filename 
-                ? String(progressData.filename).split(/[/\\]/).pop() 
+              currentFile: progressData.filename
+                ? String(progressData.filename).split(/[/\\]/).pop()
                 : (progressData.currentFile ? String(progressData.currentFile) : ''),
               downloaded_bytes: Number(progressData.downloaded_bytes || progressData.downloaded || 0),
               total_bytes: Number(progressData.total_bytes || progressData.total || 0)
             };
-            
+
             console.log('[PROGRESS UPDATE]', {
               status: safeProgress.status,
               percentage: safeProgress.percentage,
               message: safeProgress.message
             });
-            
+
             if (mainWindow && !mainWindow.isDestroyed()) {
               mainWindow.webContents.send('download-progress', safeProgress);
             }
@@ -241,15 +285,15 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
     pythonProcess.stderr.on('data', (data: Buffer) => {
       const output = data.toString().trim();
       if (!output) return;
-      
+
       if (output.includes('[PROGRESS]') || output.includes('[INFO]')) {
         console.log('[PYTHON LOG]', output);
         return;
       }
-      
+
       if (output.includes('[ERROR]')) {
         console.error('[PYTHON ERROR]', output);
-        
+
         const errorMatch = output.match(/\[ERROR\]\s*(.+)/);
         if (errorMatch && mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('download-progress', {
@@ -269,7 +313,7 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
         }
         return;
       }
-      
+
       try {
         if (output.startsWith('{')) {
           const parsed = JSON.parse(output);
