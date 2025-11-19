@@ -546,7 +546,7 @@ export default function Home() {
                 className={`w-full py-3 px-6 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
                   loading || (!url.trim() && !csvInputRef.current?.files?.length && !txtInputRef.current?.files?.length)
                     ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white hover:shadow-lg hover:shadow-blue-500/20 transform hover:-translate-y-0.5'
+                    : 'bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white hover:shadow-lg hover:shadow-blue-500/20 transform hover:-translate-y-0.5'
                 }`}
               >
                 {loading ? (

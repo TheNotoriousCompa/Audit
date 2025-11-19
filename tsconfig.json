@@ -6,7 +6,9 @@
     "allowJs": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     },
     "typeRoots": [
       "./node_modules/@types",
@@ -22,12 +24,13 @@
     ]
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
+    "next-env.d.ts",
+    "next.config.js",
     "src/types/**/*.d.ts",
-    "next.config.js"
+    "dist/renderer/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

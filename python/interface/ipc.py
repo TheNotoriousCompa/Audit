@@ -15,7 +15,13 @@ class IPC:
     
     def __init__(self):
         self.progress_callback = None
-        self.is_electron = hasattr(sys, 'executable') and 'electron' in sys.executable.lower()
+        # Check if we're running under Electron by looking for ELECTRON_RUN_AS_NODE env var
+        # or if parent process contains 'electron'
+        import os
+        self.is_electron = (
+            os.environ.get('ELECTRON_RUN_AS_NODE') is not None or
+            (hasattr(sys, 'executable') and 'electron' in sys.executable.lower())
+        )
     
     def setup_progress_callback(self, callback: Optional[Callable] = None) -> ProgressReporter:
         """Set up progress reporting."""

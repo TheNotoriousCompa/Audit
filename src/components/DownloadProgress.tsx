@@ -195,7 +195,7 @@ const DownloadProgress: React.FC<DownloadProgressProps> = ({ progress = {}, clas
       {/* Progress bar */}
       <div className="w-full h-2.5 bg-gray-700/50 rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-300 ease-out"
+          className="h-full bg-linear-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-300 ease-out"
           style={{ width: `${displayPercentage}%` }}
         />
       </div>

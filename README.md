@@ -68,6 +68,38 @@ npm run package
 yarn package
 ```
 
+## Troubleshooting
+
+### 403 Forbidden Error
+
+If you encounter a `403 Forbidden` error when trying to download videos, try these solutions:
+
+1. **Update yt-dlp**:
+   ```bash
+   pip install -U yt-dlp
+   ```
+
+2. **Use a VPN**: YouTube might be blocking your IP address. Try using a VPN to change your IP.
+
+3. **Clear yt-dlp cache**:
+   ```bash
+   yt-dlp --rm-cache-dir
+   ```
+
+4. **Try a different network**: If you're on a restricted network (like school or work), try using a different internet connection.
+
+5. **Update the application**: Make sure you're using the latest version of the application.
+
+6. **Check YouTube's status**: Sometimes YouTube might be experiencing issues. Check [YouTube's status page](https://www.youtube.com/status).
+
+7. **Temporarily disable security software**: Some antivirus or firewall settings might be interfering with the download process.
+
+If the issue persists, please open an issue on GitHub with the following information:
+- The URL you're trying to download
+- The exact error message
+- Your operating system version
+- The version of the application
+
 ## Project Structure
 
 ```
