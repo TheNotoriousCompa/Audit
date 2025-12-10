@@ -24,7 +24,7 @@ export interface DownloadResult {
 }
 
 // Download progress type - FIXED: changed 'idle' to 'ready' to match Python
-export type DownloadStatus = 'ready' | 'starting' | 'downloading' | 'converting' | 'finished' | 'error';
+export type DownloadStatus = 'ready' | 'starting' | 'downloading' | 'converting' | 'finished' | 'error' | 'cancelled' | 'info';
 
 export interface DownloadProgress {
   // Core progress fields
@@ -36,20 +36,27 @@ export interface DownloadProgress {
   eta: number;                // estimated seconds remaining
   status: DownloadStatus;     // current status
   message?: string;           // optional status message
-  
+
   // Playlist information
   isPlaylist?: boolean;       // whether this is part of a playlist
   currentItem?: number;       // current item index (1-based)
   totalItems?: number;        // total items in playlist
   currentFile?: string;       // current filename being processed
-  
+  playlistName?: string;      // name of the playlist being downloaded
+  playlistFolder?: string;    // folder where playlist files are saved
+  total_playlist_eta?: number; // ETA totale stimato per la playlist in secondi
+
+  // Explicit percentages
+  file_percent?: number;
+  playlist_percent?: number;
+
   // Raw data from yt-dlp (for debugging)
   _percent_str?: string;      // formatted percentage (e.g., "50.0%")
   _speed_str?: string;        // original speed string from yt-dlp
   _eta_str?: string;          // formatted ETA (e.g., "01:23")
   downloaded_bytes?: number;  // raw downloaded bytes
   total_bytes?: number;       // raw total bytes
-  
+
   // Additional metadata
   filename?: string;          // output filename
   speed_raw?: number;         // raw speed in bytes/s (for calculations)
@@ -65,13 +72,14 @@ export interface ElectronAPI {
   windowMinimize: () => void;
   windowMaximize: () => void;
   windowClose: () => void;
-  
+
   // Download functions
   convertYoutube: (query: string, options?: DownloadOptions) => Promise<DownloadResult>;
   onDownloadProgress: (callback: ProgressCallback) => void;
   removeProgressListener: (callback: ProgressCallback) => void;
   selectFolder: () => Promise<string | null>;
   downloadYoutube: (url: string, options: DownloadOptions) => Promise<DownloadResult>;
+  stopDownload: () => void;
 }
 
 // Extend React CSSProperties for custom properties
@@ -79,7 +87,7 @@ declare global {
   interface Window {
     electronAPI: ElectronAPI;
   }
-  
+
   namespace React {
     interface CSSProperties {
       WebkitAppRegion?: 'drag' | 'no-drag';
@@ -90,4 +98,4 @@ declare global {
   }
 }
 
-export {};
+export { };

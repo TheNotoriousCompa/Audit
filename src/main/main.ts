@@ -13,11 +13,12 @@ type PythonProcess = ChildProcessWithoutNullStreams & {
 };
 
 let mainWindow: BrowserWindow | null = null;
+let currentPythonProcess: ChildProcessWithoutNullStreams | null = null;
 
 // Auto-updater configuration
 if (!isDev) {
   const server = 'https://github.com';
-  const repo = 'YOUR_USERNAME/YOUR_REPO'; // TODO: Replace with your GitHub repo
+  const repo = 'TheNotoriousCompa/Audit';
   const feed = `${server}/${repo}/releases/latest`;
 
   autoUpdater.setFeedURL({ url: feed });
@@ -211,6 +212,9 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
       stdio: ['pipe', 'pipe', 'pipe']
     }) as PythonProcess;
 
+    // Track the current process so we can kill it if needed
+    currentPythonProcess = pythonProcess;
+
     let stdoutBuffer = '';
 
     pythonProcess.stdout.on('data', (data: Buffer) => {
@@ -224,7 +228,12 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('{')) continue;
+        if (!trimmed) continue;
+
+        if (!trimmed.startsWith('{')) {
+          console.log('[PYTHON STDOUT RAW]', trimmed);
+          continue;
+        }
 
         try {
           const parsed = JSON.parse(trimmed);
@@ -250,12 +259,24 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
                 ? String(progressData.filename).split(/[/\\]/).pop()
                 : (progressData.currentFile ? String(progressData.currentFile) : ''),
               downloaded_bytes: Number(progressData.downloaded_bytes || progressData.downloaded || 0),
-              total_bytes: Number(progressData.total_bytes || progressData.total || 0)
+              total_bytes: Number(progressData.total_bytes || progressData.total || 0),
+              // Playlist fields
+              currentItem: Number(progressData.playlist_index || 0),
+              totalItems: Number(progressData.playlist_count || 0),
+              playlistName: String(progressData.playlist_name || ''),
+              playlistFolder: String(progressData.playlist_folder || ''),
+              isPlaylist: Boolean(progressData.playlist_count && progressData.playlist_count > 0),
+              total_playlist_eta: Number(progressData.total_playlist_eta || 0),
+              // Explicit percentages
+              file_percent: Number(progressData.file_percent || 0),
+              playlist_percent: Number(progressData.playlist_percent || 0)
             };
 
             console.log('[PROGRESS UPDATE]', {
               status: safeProgress.status,
               percentage: safeProgress.percentage,
+              file_percent: safeProgress.file_percent,
+              playlist_percent: safeProgress.playlist_percent,
               message: safeProgress.message
             });
 
@@ -286,60 +307,72 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
       const output = data.toString().trim();
       if (!output) return;
 
-      if (output.includes('[PROGRESS]') || output.includes('[INFO]')) {
-        console.log('[PYTHON LOG]', output);
-        return;
-      }
+      // Also check stderr for progress JSON (in case Python sends it there)
+      const stderrBuffer = output;
+      const stderrLines = stderrBuffer.split('\n');
 
-      if (output.includes('[ERROR]')) {
-        console.error('[PYTHON ERROR]', output);
+      for (const line of stderrLines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
 
-        const errorMatch = output.match(/\[ERROR\]\s*(.+)/);
-        if (errorMatch && mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('download-progress', {
-            status: 'error',
-            message: errorMatch[1],
-            percentage: 0,
-            downloaded: 0,
-            total: 0,
-            speed: '0 B/s',
-            eta: 0,
-            _percent_str: '0%',
-            _speed_str: '0 B/s',
-            _eta_str: '--:--',
-            downloaded_bytes: 0,
-            total_bytes: 0
-          });
+        if (!trimmed.startsWith('{')) {
+          console.error('[PYTHON STDERR RAW]', trimmed);
+          continue;
         }
-        return;
-      }
 
-      try {
-        if (output.startsWith('{')) {
-          const parsed = JSON.parse(output);
-          if (parsed.type === 'error') {
-            console.error('[PYTHON JSON ERROR]', parsed.message);
+        try {
+          const parsed = JSON.parse(trimmed);
+
+          if (parsed.type === 'progress' && parsed.data) {
+            const progressData = parsed.data;
+
+            const safeProgress = {
+              status: String(progressData.status || 'downloading'),
+              percentage: Number(progressData.percentage || 0),
+              downloaded: Number(progressData.downloaded_bytes || progressData.downloaded || 0),
+              total: Number(progressData.total_bytes || progressData.total || 0),
+              speed: String(progressData._speed_str || progressData.speed || '0 B/s'),
+              eta: Number(progressData.eta || 0),
+              message: String(progressData.message || ''),
+              _percent_str: String(progressData._percent_str || '0%'),
+              _speed_str: String(progressData._speed_str || '0 B/s'),
+              _eta_str: String(progressData._eta_str || '--:--'),
+              filename: progressData.filename
+                ? String(progressData.filename).split(/[/\\]/).pop()
+                : (progressData.currentFile ? String(progressData.currentFile) : ''),
+              currentFile: progressData.filename
+                ? String(progressData.filename).split(/[/\\]/).pop()
+                : (progressData.currentFile ? String(progressData.currentFile) : ''),
+              downloaded_bytes: Number(progressData.downloaded_bytes || progressData.downloaded || 0),
+              total_bytes: Number(progressData.total_bytes || progressData.total || 0),
+              // Playlist fields
+              currentItem: Number(progressData.playlist_index || 0),
+              totalItems: Number(progressData.playlist_count || 0),
+              playlistName: String(progressData.playlist_name || ''),
+              playlistFolder: String(progressData.playlist_folder || ''),
+              isPlaylist: Boolean(progressData.playlist_count && progressData.playlist_count > 0),
+              total_playlist_eta: Number(progressData.total_playlist_eta || 0)
+            };
+
+            console.log('[PROGRESS UPDATE FROM STDERR]', {
+              status: safeProgress.status,
+              percentage: safeProgress.percentage,
+              message: safeProgress.message
+            });
+
             if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('download-progress', {
-                status: 'error',
-                message: parsed.message || 'Unknown error',
-                percentage: 0,
-                downloaded: 0,
-                total: 0,
-                speed: '0 B/s',
-                eta: 0
-              });
+              mainWindow.webContents.send('download-progress', safeProgress);
             }
           }
-        } else {
-          console.error('[PYTHON STDERR]', output);
+        } catch {
+          // If it's not JSON, just log it as regular stderr output
+          console.log('[PYTHON STDERR]', output);
         }
-      } catch {
-        console.error('[PYTHON STDERR]', output);
       }
     });
 
     pythonProcess.on("close", (code) => {
+      currentPythonProcess = null; // Reset when process closes
       if (code !== 0) {
         resolve({
           success: false,
@@ -394,6 +427,23 @@ function registerIPCHandlers() {
   ipcMain.on("window:close", () => {
     console.log("main: window:close received");
     if (mainWindow) mainWindow.close();
+  });
+
+  ipcMain.on("download:stop", () => {
+    console.log("main: download:stop received");
+    if (currentPythonProcess) {
+      currentPythonProcess.kill('SIGTERM');
+      currentPythonProcess = null;
+
+      // Notify frontend that download was cancelled
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('download-progress', {
+          status: 'cancelled',
+          message: 'Download fermato dall\'utente',
+          percentage: 0
+        });
+      }
+    }
   });
 }
 

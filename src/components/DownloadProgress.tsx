@@ -1,232 +1,164 @@
-import * as React from 'react';
-import type { DownloadProgress, DownloadStatus } from '@/types/electron';
 
-type ProgressData = Partial<DownloadProgress> & {
-  // Add any additional properties specific to this component
-  filename?: string;
-};
+import React, { useEffect, useState } from 'react';
+import { Download, Music, AlertCircle, CheckCircle2, FileAudio, Folder, ListMusic } from 'lucide-react';
+import type { DownloadProgress as DownloadProgressType } from '@/types/electron';
 
 interface DownloadProgressProps {
-  progress?: ProgressData;
-  className?: string;
+  progress?: DownloadProgressType;
 }
 
-const DownloadProgress: React.FC<DownloadProgressProps> = ({ progress = {}, className = '' }) => {
-  // Format file size for display
-  const formatBytes = (bytes: number, decimals = 1): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`;
-  };
+const DownloadProgressComponent: React.FC<DownloadProgressProps> = ({ progress }) => {
+  const [internalProgress, setInternalProgress] = useState(progress);
 
-  // Format time (MM:SS)
-  const formatTime = (eta: number | string | undefined): string => {
-    if (eta === undefined || eta === null) return '--:--';
-    
-    // If it's already a string in MM:SS format, return as is
-    if (typeof eta === 'string' && /^\d+:\d{2}$/.test(eta)) return eta;
-    
-    // If it's a number (seconds), convert to MM:SS
-    const seconds = typeof eta === 'string' ? parseInt(eta, 10) : eta;
-    if (!isNaN(seconds) && seconds >= 0) {
-      const mins = Math.floor(seconds / 60);
-      const secs = Math.floor(seconds % 60);
-      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    }
-    
-    return '--:--';
-  };
+  useEffect(() => {
+    setInternalProgress(progress);
+  }, [progress]);
 
-  // Get appropriate color based on status
-  const getStatusColor = (status: DownloadStatus): string => {
+  if (!internalProgress || (internalProgress.status === 'ready' && internalProgress.percentage === 0 && !internalProgress.message)) return null;
+
+  // Ensure percentage is between 0 and 100
+  const isPlaylist = internalProgress.isPlaylist;
+  const percent = Math.min(100, Math.max(0, internalProgress.percentage || 0));
+  const status = internalProgress.status || 'starting';
+  const speed = internalProgress.speed_str || internalProgress._speed_str || '0 B/s';
+
+
+  const currentFile = internalProgress.filename || internalProgress.currentFile || '';
+  const playlistName = internalProgress.playlistName;
+  const currentItem = internalProgress.currentItem || 0;
+  const totalItems = internalProgress.totalItems || 0;
+
+  // Determine status color and icon
+  const getStatusInfo = () => {
     switch (status) {
-      case 'downloading': return 'bg-blue-500';
-      case 'converting': return 'bg-purple-500';
-      case 'finished': return 'bg-green-500';
-      case 'error': return 'bg-red-500';
-      case 'idle' as DownloadStatus:
-      case 'starting' as DownloadStatus:
-      default: return 'bg-gray-500';
+      case 'finished':
+        return { color: 'text-green-400', bg: 'bg-green-500', icon: CheckCircle2 };
+      case 'error':
+        return { color: 'text-red-400', bg: 'bg-red-500', icon: AlertCircle };
+      case 'downloading':
+        return { color: 'text-blue-400', bg: 'bg-blue-500', icon: Download };
+      case 'converting':
+        return { color: 'text-purple-400', bg: 'bg-purple-500', icon: Music };
+      case 'cancelled':
+        return { color: 'text-gray-400', bg: 'bg-gray-500', icon: AlertCircle };
+      case 'info':
+        return { color: 'text-yellow-400', bg: 'bg-yellow-500', icon: Download };
+      default:
+        return { color: 'text-blue-400', bg: 'bg-blue-500', icon: Download };
     }
   };
 
-  // Process and normalize progress data
-  const getProgressData = () => {
-    // Default values
-    let percentage = 0;
-    let status: DownloadStatus = 'idle' as DownloadStatus;
-    
-    // Calculate percentage from available data
-    if (progress?._percent_str) {
-      const percentStr = progress._percent_str.replace(/[^\d.]/g, '');
-      percentage = Math.min(100, Math.max(0, parseFloat(percentStr) || 0));
-    } else if (typeof progress?.percentage === 'number') {
-      percentage = Math.min(100, Math.max(0, progress.percentage));
-    }
-    
-    // Determine status with better type safety
-    if (progress?.status) {
-      status = progress.status;
-    } else if (percentage > 0 && percentage < 100) {
-      status = 'downloading';
-    } else if (percentage === 100) {
-      status = 'finished';
-    }
-    
-    // Get the best available speed string
-    const speedStr = progress?._speed_str || progress?.speed || '0 B/s';
-    
-    // Get the best available file size information
-    const downloadedBytes = progress?.downloaded_bytes || progress?.downloaded || 0;
-    const totalBytes = progress?.total_bytes || progress?.total || 0;
-    
-    // Format the status message
-    let statusMessage = progress?.message || '';
-    if (!statusMessage) {
-      switch (status) {
-        case 'downloading':
-          statusMessage = 'Downloading...';
-          break;
-        case 'converting':
-          statusMessage = 'Converting...';
-          break;
-        case 'finished':
-          statusMessage = 'Download completed';
-          break;
-        case 'error':
-          statusMessage = 'An error occurred';
-          break;
-        default:
-          statusMessage = 'Ready';
-      }
-    }
-    
-    // Handle playlist information if available
-    let playlistInfo = '';
-    if (progress?.totalItems && progress.totalItems > 1) {
-      const current = (progress.currentItem || 0) + 1;
-      const total = progress.totalItems;
-      playlistInfo = `(${current} of ${total}) `;
-    }
-    
-    // Get current file name if available and ensure it has .mp3 extension
-    const currentFile = (progress?.currentFile || progress?.filename || '').replace(/\.(webm|m4a|mp4)$/i, '.mp3');
-    
-    // Get formatted ETA
-    const eta = progress?._eta_str || formatTime(progress?.eta);
-    
-    return {
-      percentage,
-      status,
-      speed: speedStr,
-      eta,
-      downloaded: downloadedBytes,
-      total: totalBytes,
-      message: statusMessage,
-      playlistInfo,
-      currentFile
-    };
-  };
-
-  const {
-    percentage,
-    status,
-    speed,
-    eta,
-    downloaded,
-    total,
-    message,
-    playlistInfo,
-    currentFile
-  } = getProgressData();
-
-  // Animate progress bar
-  const [displayPercentage, setDisplayPercentage] = React.useState(0);
-  React.useEffect(() => {
-    const timer = setTimeout(() => setDisplayPercentage(percentage), 50);
-    return () => clearTimeout(timer);
-  }, [percentage]);
-
-  // Show success message when download completes
-  const [showSuccess, setShowSuccess] = React.useState(false);
-  React.useEffect(() => {
-    if (status === 'finished') {
-      setShowSuccess(true);
-      const timer = setTimeout(() => setShowSuccess(false), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [status]);
-
-  // Don't show anything if there's no active download and no message
-  const shouldHide = !showSuccess && !message && (!status || status === ('idle' as DownloadStatus));
-  if (shouldHide) {
-    return null;
-  }
+  const { color, bg, icon: Icon } = getStatusInfo();
 
   return (
-    <div className={`w-full space-y-3 p-4 bg-black-800/30 rounded-lg ${className}`}>
-      {/* Success notification */}
-      {showSuccess && (
-        <div className="mb-3 p-2 bg-green-500/20 border border-green-500/50 rounded text-sm text-green-200">
-          {message || 'Download completed successfully!'}
+    <div className="w-full bg-black/40 backdrop-blur-md rounded-2xl p-5 border border-white/10 shadow-xl transition-all duration-300 hover:border-white/20 hover:shadow-2xl hover:bg-black/50">
+
+      {/* Header Row: Icon + Main Info */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className={`p-2.5 rounded-xl bg-white/5 border border-white/10 ${color}`}>
+            <Icon className="w-6 h-6 animate-pulse" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <h3 className="font-bold text-white text-base truncate flex items-center gap-2">
+              {status === 'finished' ? 'Download Complete!' :
+                status === 'error' ? 'Download Failed' :
+                  status === 'cancelled' ? 'Download Cancelled' :
+                    status === 'info' ? (internalProgress.message || 'Processing...') :
+                      isPlaylist ? 'Downloading Playlist...' : 'Downloading...'}
+            </h3>
+
+            {/* Playlist Info or Single File Info */}
+            {isPlaylist ? (
+              <div className="flex flex-col gap-0.5 mt-0.5">
+                {playlistName && (
+                  <div className="flex items-center gap-1.5 text-xs text-purple-300 font-medium overflow-hidden">
+                    <Folder className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{playlistName}</span>
+                  </div>
+                )}
+                {currentItem > 0 && totalItems > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs text-blue-300 overflow-hidden">
+                    <ListMusic className="w-3 h-3 shrink-0" />
+                    <span className="truncate">
+                      Song {currentItem} of {totalItems}
+                      <span className="text-white/60 ml-1.5">• {Math.round(internalProgress.percentage || 0)}%</span>
+                    </span>
+                  </div>
+                )}
+                {currentFile && (
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400 overflow-hidden mt-1">
+                    <FileAudio className="w-3 h-3 shrink-0" />
+                    <span className="truncate max-w-[200px] sm:max-w-xs opacity-75">
+                      {currentFile.replace(/\.(webm|m4a|webp)$/, '.mp3')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              currentFile && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-400 overflow-hidden mt-1">
+                  <FileAudio className="w-3 h-3 shrink-0" />
+                  <span className="truncate max-w-[200px] sm:max-w-xs">
+                    {currentFile.replace(/\.(webm|m4a|webp)$/, '.mp3')}
+                  </span>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Percentage Badge */}
+        <div className="flex flex-col items-end">
+          {status !== 'info' && (
+            <div className="text-2xl font-bold text-white tabular-nums tracking-tight">
+              {percent.toFixed(1)}%
+            </div>
+          )}
+          <div className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/5 border border-white/10 ${color}`}>
+            {status}
+          </div>
+        </div>
+      </div>
+
+      {/* Progress Bar - Hide for info status */}
+      {status !== 'info' && (
+        <div className="relative h-2.5 bg-gray-800/50 rounded-full overflow-hidden mb-3 border border-white/5">
+          {/* Background stripe pattern */}
+          <div className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage: 'linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent)',
+              backgroundSize: '1rem 1rem'
+            }}
+          />
+
+          {/* Active progress bar */}
+          <div
+            className={`absolute left-0 top-0 h-full ${bg} transition-all duration-300 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)]`}
+            style={{ width: `${percent}%` }}
+          />
         </div>
       )}
 
-      {/* Status row */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor(status)}`} />
-          <span className="text-sm font-medium text-gray-200">
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-            {playlistInfo && <span className="text-gray-400 ml-1">{playlistInfo}</span>}
-          </span>
-        </div>
-      </div>
-
-      {/* Current file name */}
-      {currentFile && (
-        <div className="text-xs text-gray-400 truncate" title={currentFile}>
-          {currentFile}
+      {/* Stats Row - Hide for info status */}
+      {status !== 'info' && (
+        <div className="flex items-center justify-center text-center text-xs text-gray-400 bg-white/5 rounded-lg py-3 border border-white/5">
+          <div className="flex flex-col items-center justify-center">
+            <span className="text-[10px] uppercase tracking-wider opacity-60 mb-1">Download Speed</span>
+            <span className="font-bold text-white tabular-nums text-lg tracking-wide">{speed}</span>
+          </div>
         </div>
       )}
 
-      {/* Progress bar */}
-      <div className="w-full h-2.5 bg-gray-700/50 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-linear-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-300 ease-out"
-          style={{ width: `${displayPercentage}%` }}
-        />
-      </div>
-
-      {/* Progress details */}
-      <div className="flex flex-col space-y-1 text-xs text-gray-400">
-        {/* File size and progress */}
-        <div className="flex items-center justify-between">
-          <span className="font-mono">{formatBytes(downloaded)} / {formatBytes(total)}</span>
-          <span className="text-gray-300">{Math.round(percentage)}%</span>
-        </div>
-        
-        {/* Speed and ETA */}
-        <div className="flex items-center justify-between">
-          <span className="whitespace-nowrap">
-            <span className="text-gray-300">Speed:</span> {speed}
-          </span>
-          <span className="whitespace-nowrap">
-            <span className="text-gray-300">ETA:</span> {eta}
-          </span>
-        </div>
-      </div>
-
-      {/* Status message */}
-      {message && !showSuccess && (
-        <div className="text-xs text-gray-400">
-          {message}
+      {/* Error Message */}
+      {internalProgress.message && status === 'error' && (
+        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-300 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{internalProgress.message}</span>
         </div>
       )}
     </div>
   );
 };
 
-export default DownloadProgress;
+export default DownloadProgressComponent;

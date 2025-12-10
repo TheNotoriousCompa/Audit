@@ -7,6 +7,7 @@
   "description": "Youtube video converter",
   "license": "MIT License",
   "scripts": {
+    "restart": "pkill -f 'node server.js' && npm run dev",
     "dev:renderer": "next dev",
     "dev:electron": "electron .",
     "build:renderer": "next build",

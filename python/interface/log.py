@@ -35,7 +35,8 @@ def setup_logging(log_file: Optional[str] = None, level: int = logging.INFO) -> 
     
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Use stderr for logs to avoid interfering with stdout JSON
+    console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     
@@ -82,8 +83,8 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
             secs = eta % 60
             eta_str = f"{mins}:{secs:02d}"
         
-        # Determine status - CRITICAL: use 'ready' instead of 'idle'
-        status = data.get('status', 'ready')
+        # Determine status
+        status = data.get('status', 'downloading')
         
         # Map Python yt-dlp status to our status types
         if status == 'downloading':
@@ -97,8 +98,6 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
             status = 'downloading'
         elif percentage >= 100:
             status = 'finished'
-        else:
-            status = 'ready'
         
         # Get file sizes
         downloaded_bytes = int(data.get('downloaded_bytes') or data.get('downloaded') or 0)
@@ -123,13 +122,18 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
             'speed': speed_str,
             'eta': eta,
             'message': str(data.get('message', '')),
-            # Include raw values for compatibility
             '_percent_str': f"{percentage}%",
             'downloaded_bytes': downloaded_bytes,
             'total_bytes': total_bytes,
             '_speed_str': speed_str,
             '_eta_str': eta_str,
-            'currentFile': current_file
+            'currentFile': current_file,
+            'filename': current_file,
+            # Playlist fields
+            'playlist_index': int(data.get('playlist_index', 0)),
+            'playlist_count': int(data.get('playlist_count', 0)),
+            'playlist_name': str(data.get('playlist_name', '')),
+            'total_playlist_eta': int(data.get('total_playlist_eta', 0))
         }
         
         return formatted

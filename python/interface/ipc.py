@@ -44,7 +44,8 @@ class IPC:
             }
             
             # Always write to stdout as single-line JSON for Electron
-            print(json.dumps(message), flush=True)
+            # Prepend \n to ensure it's on a new line even if yt-dlp printed without newline
+            print('\n' + json.dumps(message), flush=True)
             
             # Also log to stderr for debugging (won't interfere with JSON parsing)
             status = progress_data.get('status', 'unknown')
@@ -86,7 +87,7 @@ class IPC:
                 **kwargs
             }
         }
-        print(json.dumps(result), flush=True)
+        print('\n' + json.dumps(result), flush=True)
     
     def read_input(self):
         """Read input from stdin (Electron) or command line."""

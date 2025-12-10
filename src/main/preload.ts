@@ -39,6 +39,10 @@ const electronAPI: ElectronAPI = {
   convertYoutube: (query: string, options: DownloadOptions = {}) => {
     console.log('convertYoutube called with query:', query, 'and options:', options);
     return ipcRenderer.invoke('convert-youtube', query, options);
+  },
+  stopDownload: () => {
+    console.log('stopDownload called');
+    ipcRenderer.send('download:stop');
   }
 };
 

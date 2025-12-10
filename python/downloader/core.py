@@ -173,33 +173,110 @@ def download_media(
             progress_callback({"status": "error", "message": error_msg})
         return False, None, error_msg
 
+    # Playlist tracking state (will be updated during download)
+    playlist_state = {
+        'current_index': 0,
+        'total_count': 0,
+        'playlist_name': None
+    }
+    
+    # Wrapper for progress callback to inject playlist info
+    def progress_wrapper(d):
+        # Add playlist info to the progress data
+        if playlist_state['total_count'] > 0:
+            d['playlist_index'] = playlist_state['current_index']
+            d['playlist_count'] = playlist_state['total_count']
+            d['playlist_name'] = playlist_state['playlist_name']
+        _on_progress(d, progress_callback)
+        
+        # Increment index AFTER the callback, so the "finished" event uses the current index
+        if playlist_state['total_count'] > 0:
+            if d.get('status') == 'finished' and playlist_state['current_index'] < playlist_state['total_count']:
+                playlist_state['current_index'] += 1
+    
     # Base yt-dlp options
     ydl_opts = {
         "quiet": True,
+        "verbose": False,
         "no_warnings": True,
         "ignoreerrors": True,
         "format": "bestaudio/best",
         "outtmpl": str(Path(output_dir) / "%(title)s.%(ext)s"),
         "noplaylist": not process_playlist,
-        "progress_hooks": [lambda d: _on_progress(d, progress_callback)],
+        "progress_hooks": [progress_wrapper],
+        "writethumbnail": True,  # Download thumbnail
         "postprocessors": [],
     }
     
     if ffmpeg_path:
+        # 1. Convert to audio format (e.g., mp3)
         ydl_opts["postprocessors"].append({
             "key": "FFmpegExtractAudio",
             "preferredcodec": format,
             "preferredquality": str(bitrate),
         })
         ydl_opts["ffmpeg_location"] = str(Path(ffmpeg_path).parent)
+
+        # 2. Embed thumbnail (must be AFTER conversion)
+        ydl_opts["postprocessors"].append({
+            "key": "EmbedThumbnail",
+        })
     else:
         ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio"
 
     output_path = None
+    playlist_folder = None
+
+    info = None
 
     try:
+        # Prima estrazione VELOCE per ottenere solo il nome della playlist (senza metadati dettagliati)
+        # Usa extract_flat per velocizzare enormemente questa fase
+        if process_playlist:
+            if progress_callback:
+                progress_callback({"status": "info", "message": "Extracting playlist info..."})
+            
+            flat_opts = ydl_opts.copy()
+            flat_opts['extract_flat'] = 'in_playlist'  # Non scarica metadati dettagliati
+            with yt_dlp.YoutubeDL(flat_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+            
+        # Se è una playlist e process_playlist è True, crea una cartella con il nome della playlist
+        if info and process_playlist and "entries" in info and info["entries"]:
+            playlist_title = info.get('title', info.get('playlist_title', 'Playlist'))
+            playlist_folder = Path(output_dir) / sanitize_filename(playlist_title)
+            ensure_directory(str(playlist_folder))
+            
+            # Update playlist state for progress tracking
+            playlist_state['total_count'] = len([e for e in info['entries'] if e])
+            playlist_state['playlist_name'] = playlist_title
+            playlist_state['current_index'] = 1  # Start from 1 (1-based indexing)
+            
+            # Aggiorna l'output template per salvare nella cartella della playlist
+            ydl_opts["outtmpl"] = str(playlist_folder / "%(title)s.%(ext)s")
+            
+            if progress_callback:
+                progress_callback({
+                    "status": "info",
+                    "message": f"Playlist rilevata: {playlist_title}",
+                    "playlist_name": playlist_title,
+                    "playlist_folder": str(playlist_folder),
+                    "playlist_count": playlist_state['total_count']
+                })
+        
+        
+        # Ora scarica con le opzioni aggiornate (nuovo contesto)
+        if progress_callback:
+            progress_callback({"status": "info", "message": "Starting download process..."})
+            
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+            try:
+                info = ydl.extract_info(url, download=True)
+            except Exception as e:
+                if progress_callback:
+                    progress_callback({"status": "error", "message": f"Download failed: {str(e)}"})
+                raise e
+
             
             if info is None:
                 return False, None, "Impossibile scaricare il media"
@@ -207,7 +284,8 @@ def download_media(
             # Playlist
             if "entries" in info and info["entries"]:
                 entries = info["entries"]
-                output_path = Path(output_dir)
+                # Usa la cartella della playlist se disponibile, altrimenti output_dir
+                output_path = playlist_folder if playlist_folder else Path(output_dir)
                 
                 # Process playlist files
                 for entry in entries:
@@ -233,8 +311,8 @@ def download_media(
                     new_path = downloaded_file.parent / new_name
                     
                     try:
-                        # If the target file exists, remove it first
-                        if new_path.exists():
+                        # If the target file exists, remove it first (but only if it's different from source)
+                        if new_path != downloaded_file and new_path.exists():
                             new_path.unlink()
                         
                         # Rename the file
@@ -250,10 +328,38 @@ def download_media(
                                 entry['uploader'] = info['uploader']
                                 
                             _process_metadata(downloaded_file, entry, progress_callback)
-                            logger.info(f"Processed metadata for: {downloaded_file.name}")
+                            # logger.info removed to avoid Unicode errors on Windows
                             
                     except Exception as e:
                         logger.error(f"Error processing {downloaded_file}: {str(e)}", exc_info=True)
+                
+                # Cleanup playlist residual thumbnails
+                # Cleanup playlist residual thumbnails
+                # Check both playlist folder and root output folder
+                folders_to_check = []
+                if playlist_folder and playlist_folder.exists():
+                    folders_to_check.append(playlist_folder)
+                if output_dir and Path(output_dir).exists():
+                     folders_to_check.append(Path(output_dir))
+
+                playlist_name_sanitized = sanitize_filename(info.get('title', ''))
+
+                for folder in folders_to_check:
+                    try:
+                        # Common extensions for thumbnails
+                        for ext in ['*.jpg', '*.jpeg', '*.png', '*.webp']:
+                            for thumb_file in folder.glob(ext):
+                                # If the filename looks like the playlist name, delete it
+                                if thumb_file.stem == playlist_name_sanitized:
+                                    try:
+                                        if thumb_file.exists():
+                                            thumb_file.unlink()
+                                            logger.info(f"Deleted playlist thumbnail: {thumb_file.name}")
+                                    except OSError:
+                                        pass
+                    except Exception as e:
+                        logger.warning(f"Failed to cleanup playlist thumbnails in {folder}: {e}")
+
             else:
                 # Singolo video
                 if 'requested_downloads' in info and info['requested_downloads']:
@@ -336,52 +442,80 @@ def _on_progress(d: dict[str, Any], callback: Optional[Callable] = None) -> None
         downloaded_bytes = int(d.get('downloaded_bytes', 0) or 0)
         total_bytes = int((d.get('total_bytes') or d.get('total_bytes_estimate') or 0))
         
-        # Calculate percentage if not provided
-        percent_str = str(d.get('_percent_str', '0%')).strip()
-        if not percent_str.endswith('%'):
-            if total_bytes > 0:
-                percent = min(100, (downloaded_bytes / total_bytes) * 100)
-                percent_str = f"{percent:.1f}%"
+        # Check if this is part of a playlist
+        is_playlist = d.get('playlist_index') is not None and d.get('playlist_count') is not None
+        
+        # Calculate file percentage (single file progress)
+        file_percent = 0.0
+        percent_str = str(d.get('_percent_str', '0%')).strip().replace('%', '')
+        try:
+            file_percent = float(percent_str)
+        except ValueError:
+            pass
+            
+        # Fallback: calculate from bytes if string parsing failed or result is 0
+        if file_percent == 0 and total_bytes > 0:
+            file_percent = (downloaded_bytes / total_bytes) * 100
+            
+        # Calculate playlist percentage (overall progress)
+        playlist_percent = 0.0
+        
+        if is_playlist:
+            current_index = d.get('playlist_index', 1)
+            total_songs = d.get('playlist_count', 1)
+            
+            # Simplified logic as requested by user:
+            # Percentage = (current_index / total_songs) * 100
+            # giving step-wise progress (e.g. Song 1/10 = 10%, Song 2/10 = 20%)
+            if total_songs > 0:
+                playlist_percent = (current_index / total_songs) * 100
             else:
-                percent_str = "0%"
-        
-        # Get current ETA in seconds
-        current_eta = d.get('eta', 0)
-        
-        # Calculate total playlist ETA if this is part of a playlist
+                playlist_percent = 0
+            
+            percent_str = f"{playlist_percent:.1f}%"
+        else:
+            # For single files, playlist progress IS file progress
+            playlist_percent = file_percent
+            percent_str = f"{file_percent:.1f}%"
+
+        # Get current ETA in seconds (ensure it's a number)
+        current_eta = d.get('eta')
+        if current_eta is None:
+            current_eta = 0
+
+        # Calculate estimated total playlist ETA
         total_playlist_eta = 0
-        if d.get('playlist_index') is not None and d.get('playlist_count') is not None:
+        if is_playlist and current_eta > 0:
             current_index = d.get('playlist_index', 1)
             total_songs = d.get('playlist_count', 1)
             remaining_songs = total_songs - current_index
-            
-            # Calculate remaining time for current song (scaled by progress)
-            current_progress = float(percent_str.rstrip('%')) / 100.0
-            if current_progress > 0 and current_progress < 1:
-                remaining_current_song = current_eta * (1 - current_progress)
-            else:
-                remaining_current_song = current_eta
-                
-            # Calculate total remaining time (current song + remaining songs)
-            total_playlist_eta = remaining_current_song + (remaining_songs * current_eta)
-        
-        # Format progress data to match what the frontend expects
+            # Crude estimation: current file ETA * remaining songs
+            # This is not accurate but better than nothing
+            total_playlist_eta = current_eta + (current_eta * remaining_songs)
+
+        # Update the progress info dictionary with EXPLICIT fields
         progress_info = {
             'status': status,
+            'percentage': playlist_percent if is_playlist else file_percent, # Main percentage for UI bar
+            'file_percent': file_percent,         # Explicit file progress (0-100)
+            'playlist_percent': playlist_percent, # Explicit playlist progress (0-100)
+            'downloaded': downloaded_bytes,
+            'total': total_bytes,
+            'speed': d.get('_speed_str', '0 B/s'),
+            'eta': current_eta,
+            'message': '', # Will be set below
             '_percent_str': percent_str,
-            'percentage': float(percent_str.rstrip('%')),  # Add numeric percentage
-            'downloaded_bytes': downloaded_bytes,
-            'total_bytes': total_bytes,
             '_speed_str': d.get('_speed_str', '0 B/s'),
             '_eta_str': d.get('_eta_str', '--:--'),
+            'currentFile': d.get('filename', ''),
             'filename': d.get('filename', ''),
-            'eta': current_eta,  # Current song ETA in seconds
-            'total_playlist_eta': int(total_playlist_eta) if total_playlist_eta > 0 else 0,  # Total playlist ETA in seconds
-            'speed': d.get('speed', 0),  # Add numeric speed in bytes/s
-            'is_playlist': bool(d.get('playlist_index') is not None),
             'playlist_index': d.get('playlist_index'),
-            'playlist_count': d.get('playlist_count')
+            'playlist_count': d.get('playlist_count'),
+            'playlist_name': d.get('playlist_name'),
+            'isPlaylist': is_playlist
         }
+        
+
         
         # Special handling for finished status
         if status == 'finished':
@@ -389,20 +523,24 @@ def _on_progress(d: dict[str, Any], callback: Optional[Callable] = None) -> None
             progress_info['percentage'] = 100.0
             progress_info['downloaded_bytes'] = total_bytes  # Ensure we show 100% complete
         
-        # Debug logging
-        print(f"[PROGRESS] {progress_info}")
+        # Ensure type safety and fallback values
+        progress_info['percentage'] = float(progress_info.get('percentage', 0) or 0)
+        progress_info['status'] = str(progress_info.get('status', 'ready') or 'ready')
+        progress_info['downloaded_bytes'] = int(progress_info.get('downloaded_bytes', 0) or 0)
+        progress_info['total_bytes'] = int(progress_info.get('total_bytes', 0) or 0)
+        
+        # Debug logging (removed to avoid Unicode errors on Windows)
+        # print(f"[PROGRESS] {progress_info}")
         
         # Call the callback with the formatted data
         if callable(callback):
             callback(progress_info)
             
     except Exception as e:
-        print(f"[ERROR] Error in progress callback: {str(e)}")
-        import traceback
-        traceback.print_exc()
-            
-    except Exception as e:
         logger.warning(f"Error in progress callback: {str(e)}", exc_info=True)
         # Send error status to frontend
         if callable(callback):
-            callback({'status': 'error', 'message': str(e)})
+            try:
+                callback({'status': 'error', 'message': str(e)})
+            except Exception as inner_e:
+                logger.error(f"Failed to send error callback: {str(inner_e)}")
