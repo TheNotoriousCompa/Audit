@@ -21,6 +21,7 @@ import yt_dlp
 # Importa le funzioni necessarie dal modulo postprocess
 from .postprocess import set_mp3_metadata, download_artwork
 from .utils import ensure_directory, sanitize_filename
+from .progress import reset_progress_state, set_playlist_info, calculate_progress
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +158,9 @@ def download_media(
     """
     Scarica media da YouTube (singolo video o playlist) e li converte nel formato desiderato.
     """
+    # Reset global progress state for each new download session
+    reset_progress_state()
+
     ensure_directory(output_dir)
 
     ffmpeg_path = check_ffmpeg()
@@ -173,26 +177,40 @@ def download_media(
             progress_callback({"status": "error", "message": error_msg})
         return False, None, error_msg
 
-    # Playlist tracking state (will be updated during download)
+    # Initialize playlist tracking state
     playlist_state = {
-        'current_index': 0,
-        'total_count': 0,
-        'playlist_name': None
+        'current_index': 0,      # 0-based index of current file in playlist
+        'total_count': 0,        # Total number of files in playlist
+        'playlist_name': None    # Name of the playlist (if available)
     }
     
-    # Wrapper for progress callback to inject playlist info
+    # Wrapper for progress callback to handle playlist tracking
     def progress_wrapper(d):
+        nonlocal playlist_state
+        
+        # Update playlist state if this is a new playlist
+        if 'playlist' in d and d['playlist'] is not None:
+            if 'playlist_index' in d and 'playlist_count' in d:
+                playlist_state['current_index'] = d['playlist_index']
+                playlist_state['total_count'] = d['playlist_count']
+                if 'playlist' in d and 'title' in d['playlist']:
+                    playlist_state['playlist_name'] = d['playlist']['title']
+        
         # Add playlist info to the progress data
         if playlist_state['total_count'] > 0:
-            d['playlist_index'] = playlist_state['current_index']
+            d['playlist_index'] = playlist_state['current_index'] + 1  # 1-based index
             d['playlist_count'] = playlist_state['total_count']
             d['playlist_name'] = playlist_state['playlist_name']
+            d['isPlaylist'] = True
+        
+        # Process progress through _on_progress
         _on_progress(d, progress_callback)
         
-        # Increment index AFTER the callback, so the "finished" event uses the current index
-        if playlist_state['total_count'] > 0:
-            if d.get('status') == 'finished' and playlist_state['current_index'] < playlist_state['total_count']:
-                playlist_state['current_index'] += 1
+        # Increment index for the next file
+        if (playlist_state['total_count'] > 0 and 
+            d.get('status') == 'finished' and 
+            playlist_state['current_index'] < playlist_state['total_count'] - 1):
+            playlist_state['current_index'] += 1
     
     # Base yt-dlp options
     ydl_opts = {
@@ -200,8 +218,8 @@ def download_media(
         "verbose": False,
         "no_warnings": True,
         "ignoreerrors": True,
-        "format": "bestaudio/best",
-        "outtmpl": str(Path(output_dir) / "%(title)s.%(ext)s"),
+        "format": f"bestaudio[ext={format}]/bestaudio",  # Prioritize the requested format
+        "outtmpl": str(Path(output_dir) / f"%(title)s.{format}"),  # Force the output extension
         "noplaylist": not process_playlist,
         "progress_hooks": [progress_wrapper],
         "writethumbnail": True,  # Download thumbnail
@@ -251,6 +269,9 @@ def download_media(
             playlist_state['total_count'] = len([e for e in info['entries'] if e])
             playlist_state['playlist_name'] = playlist_title
             playlist_state['current_index'] = 1  # Start from 1 (1-based indexing)
+
+            # Inizializza anche il calcolatore di progressi globale
+            set_playlist_info(playlist_state['total_count'], playlist_title)
             
             # Aggiorna l'output template per salvare nella cartella della playlist
             ydl_opts["outtmpl"] = str(playlist_folder / "%(title)s.%(ext)s")
@@ -426,115 +447,44 @@ def download_media(
         return False, None, f"Errore imprevisto: {error_msg}"
 
 def _on_progress(d: dict[str, Any], callback: Optional[Callable] = None) -> None:
-    """Callback di progresso per yt-dlp.
+    """Progress callback for yt-dlp.
     
     Args:
-        d: Dizionario con le informazioni sul progresso
-        callback: Funzione di callback per aggiornare lo stato del download
+        d: Dictionary with progress information
+        callback: Callback function to update download status
     """
     if callback is None:
         return
 
     try:
-        status = d.get('status', '')
-        
-        # Ensure we have consistent numeric types
-        downloaded_bytes = int(d.get('downloaded_bytes', 0) or 0)
-        total_bytes = int((d.get('total_bytes') or d.get('total_bytes_estimate') or 0))
-        
-        # Check if this is part of a playlist
-        is_playlist = d.get('playlist_index') is not None and d.get('playlist_count') is not None
-        
-        # Calculate file percentage (single file progress)
-        file_percent = 0.0
-        percent_str = str(d.get('_percent_str', '0%')).strip().replace('%', '')
-        try:
-            file_percent = float(percent_str)
-        except ValueError:
-            pass
-            
-        # Fallback: calculate from bytes if string parsing failed or result is 0
-        if file_percent == 0 and total_bytes > 0:
-            file_percent = (downloaded_bytes / total_bytes) * 100
-            
-        # Calculate playlist percentage (overall progress)
-        playlist_percent = 0.0
-        
-        if is_playlist:
-            current_index = d.get('playlist_index', 1)
-            total_songs = d.get('playlist_count', 1)
-            
-            # Simplified logic as requested by user:
-            # Percentage = (current_index / total_songs) * 100
-            # giving step-wise progress (e.g. Song 1/10 = 10%, Song 2/10 = 20%)
-            if total_songs > 0:
-                playlist_percent = (current_index / total_songs) * 100
-            else:
-                playlist_percent = 0
-            
-            percent_str = f"{playlist_percent:.1f}%"
-        else:
-            # For single files, playlist progress IS file progress
-            playlist_percent = file_percent
-            percent_str = f"{file_percent:.1f}%"
-
-        # Get current ETA in seconds (ensure it's a number)
-        current_eta = d.get('eta')
-        if current_eta is None:
-            current_eta = 0
-
-        # Calculate estimated total playlist ETA
-        total_playlist_eta = 0
-        if is_playlist and current_eta > 0:
-            current_index = d.get('playlist_index', 1)
-            total_songs = d.get('playlist_count', 1)
-            remaining_songs = total_songs - current_index
-            # Crude estimation: current file ETA * remaining songs
-            # This is not accurate but better than nothing
-            total_playlist_eta = current_eta + (current_eta * remaining_songs)
-
-        # Update the progress info dictionary with EXPLICIT fields
-        progress_info = {
-            'status': status,
-            'percentage': playlist_percent if is_playlist else file_percent, # Main percentage for UI bar
-            'file_percent': file_percent,         # Explicit file progress (0-100)
-            'playlist_percent': playlist_percent, # Explicit playlist progress (0-100)
-            'downloaded': downloaded_bytes,
-            'total': total_bytes,
-            'speed': d.get('_speed_str', '0 B/s'),
-            'eta': current_eta,
-            'message': '', # Will be set below
-            '_percent_str': percent_str,
+        # Prepare progress data with consistent field names coming from yt-dlp
+        progress_data = {
+            'status': d.get('status', ''),
+            'downloaded_bytes': int(d.get('downloaded_bytes', 0) or 0),
+            'total_bytes': int((d.get('total_bytes') or d.get('total_bytes_estimate') or 0)),
+            'speed': d.get('speed', 0),
+            'eta': d.get('eta', 0),
+            'filename': d.get('filename', ''),
+            '_percent_str': d.get('_percent_str', '0%'),
             '_speed_str': d.get('_speed_str', '0 B/s'),
             '_eta_str': d.get('_eta_str', '--:--'),
-            'currentFile': d.get('filename', ''),
-            'filename': d.get('filename', ''),
+            # Playlist fields (se presenti)
             'playlist_index': d.get('playlist_index'),
             'playlist_count': d.get('playlist_count'),
             'playlist_name': d.get('playlist_name'),
-            'isPlaylist': is_playlist
         }
-        
 
-        
         # Special handling for finished status
-        if status == 'finished':
-            progress_info['_percent_str'] = '100%'
-            progress_info['percentage'] = 100.0
-            progress_info['downloaded_bytes'] = total_bytes  # Ensure we show 100% complete
-        
-        # Ensure type safety and fallback values
-        progress_info['percentage'] = float(progress_info.get('percentage', 0) or 0)
-        progress_info['status'] = str(progress_info.get('status', 'ready') or 'ready')
-        progress_info['downloaded_bytes'] = int(progress_info.get('downloaded_bytes', 0) or 0)
-        progress_info['total_bytes'] = int(progress_info.get('total_bytes', 0) or 0)
-        
-        # Debug logging (removed to avoid Unicode errors on Windows)
-        # print(f"[PROGRESS] {progress_info}")
-        
-        # Call the callback with the formatted data
+        if progress_data['status'] == 'finished':
+            progress_data['downloaded_bytes'] = progress_data['total_bytes']
+            progress_data['_percent_str'] = '100%'
+
+        # Usa il ProgressCalculator per calcolare file_percent / playlist_percent / percentage
+        enriched_progress = calculate_progress(progress_data)
+
+        # Inoltra il risultato arricchito al callback
         if callable(callback):
-            callback(progress_info)
+            callback(enriched_progress)
             
     except Exception as e:
         logger.warning(f"Error in progress callback: {str(e)}", exc_info=True)

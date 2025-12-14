@@ -3,9 +3,12 @@ import React, { useState, useEffect, useRef } from "react";
 import Footer from '@/components/sections/Footer';
 import Background from "@/components/background";
 import DownloadProgressComponent from "@/components/DownloadProgress";
-import { Settings, Download, FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Palette } from "lucide-react";
+import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Settings, Palette } from "lucide-react";
 import AdvancedOptions from '@/components/sections/AdvancedOptions';
 import Personalize from '@/components/sections/Personalize';
+import DownloadButton from '@/components/DownloadButton';
+import StatusMessage from '@/components/StatusMessage';
+import Info from '@/components/sections/Info';
 import type { DownloadProgress, DownloadStatus } from '@/types/electron';
 
 export default function Home() {
@@ -21,6 +24,7 @@ export default function Home() {
     const [skipExisting] = useState(true);
     const [timeout] = useState(300);
     const [showPersonalize, setShowPersonalize] = useState(false);
+    const [showInfo, setShowInfo] = useState(false);
 
     // Load colors from localStorage on component mount
     const [colors, setColors] = useState(() => {
@@ -28,9 +32,9 @@ export default function Home() {
             const savedColors = localStorage.getItem('waveColors');
             return savedColors
                 ? JSON.parse(savedColors)
-                : { lineColor: '#c2c1c0', backgroundColor: '#000000' };
+                : { lineColor: '#50C878', backgroundColor: '#000000' };
         }
-        return { lineColor: '#c2c1c0', backgroundColor: '#000000' };
+        return { lineColor: '#50C878', backgroundColor: '#000000' };
     });
 
     // Save colors to localStorage whenever they change
@@ -73,20 +77,20 @@ export default function Home() {
     // Cancellation ref
     const isCancelled = useRef(false);
 
-    // Reset to ready state after 7 seconds of completion (only for single files, not playlists)
+    // Reset to ready state after 3 seconds of completion (single files and playlists)
     useEffect(() => {
-        if ((progress.status === 'finished' || progress.status === 'error') && !progress.isPlaylist) {
+        if (progress.status === 'finished' || progress.status === 'error') {
             const timer = setTimeout(() => {
-                setProgress(prev => ({
-                    ...prev,
-                    status: 'ready',
-                    message: '',
+                // Reset progress state
+                setProgress({
                     percentage: 0,
                     downloaded: 0,
                     total: 0,
                     speed: 0,
                     speed_str: '0 B/s',
                     eta: 0,
+                    status: 'ready',
+                    message: '',
                     _percent_str: '0%',
                     _speed_str: '0 B/s',
                     _eta_str: '--:--',
@@ -99,10 +103,14 @@ export default function Home() {
                     filename: '',
                     speed_raw: 0,
                     timestamp: Date.now()
-                }));
+                });
+                
+                // Reset form state
+                setUrl('');
                 setResult(null);
                 setError(null);
-            }, 7000);
+                setLoading(false);
+            }, 3000);
 
             return () => clearTimeout(timer);
         }
@@ -472,8 +480,20 @@ export default function Home() {
                 <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} className="flex items-center space-x-4 pr-2">
                     <button
                         onClick={() => {
+                            setShowAdvanced(!showAdvanced);
+                            if (showPersonalize) setShowPersonalize(false);
+                            if (showInfo) setShowInfo(false);
+                        }}
+                        className={`p-1.5 rounded-lg transition-colors ${showAdvanced ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                        title="Advanced Options"
+                    >
+                        <Settings className="w-5 h-5 text-gray-300" />
+                    </button>
+                    <button
+                        onClick={() => {
                             setShowPersonalize(!showPersonalize);
                             if (showAdvanced) setShowAdvanced(false);
+                            if (showInfo) setShowInfo(false);
                         }}
                         className={`p-1.5 rounded-lg transition-colors ${showPersonalize ? 'bg-white/10' : 'hover:bg-white/5'}`}
                         title="Personalize"
@@ -482,13 +502,14 @@ export default function Home() {
                     </button>
                     <button
                         onClick={() => {
-                            setShowAdvanced(!showAdvanced);
+                            setShowInfo(true);
+                            if (showAdvanced) setShowAdvanced(false);
                             if (showPersonalize) setShowPersonalize(false);
                         }}
-                        className={`p-1.5 rounded-lg transition-colors ${showAdvanced ? 'bg-white/10' : 'hover:bg-white/5'}`}
-                        title="Settings"
+                        className={`p-1.5 rounded-lg transition-colors ${showInfo ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                        title="Info"
                     >
-                        <Settings className="w-5 h-5 text-gray-300" />
+                        <InfoIcon className="w-5 h-5 text-gray-300" />
                     </button>
                     <button
                         onClick={() => window.electronAPI?.windowMinimize?.()}
@@ -547,7 +568,7 @@ export default function Home() {
                         <div className="flex flex-col sm:flex-row gap-3">
                             <button
                                 onClick={handleSelectFolder}
-                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-black/30 hover:bg-black/50 backdrop-blur-sm border border-gray-800/50 rounded-xl text-gray-200 hover:text-white transition-colors duration-200 font-medium text-xs sm:text-sm"
+                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-black/30 hover:bg-black backdrop-blur-sm border border-gray-800/50 rounded-xl text-gray-200 hover:text-emerald-400 transition-colors duration-200 font-medium text-xs sm:text-sm"
                             >
                                 <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5" />
                                 <span className="truncate">{outputFolder ? `Output: ${outputFolder.split('\\').pop()?.split('/').pop() || 'Selected'}` : "Choose Folder"}</span>
@@ -589,53 +610,23 @@ export default function Home() {
                         </div>
 
                         {/* Download Button */}
-                        <div className="flex flex-col gap-3">
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={handleDownload}
-                                    disabled={loading || !url.trim()}
-                                    className={`flex-1 py-3 px-6 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${loading || !url.trim()
-                                        ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
-                                        : 'bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white hover:shadow-lg hover:shadow-blue-500/20 transform hover:-translate-y-0.5'
-                                        }`}
-                                >
-                                    {loading ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-2 border-white/30 border-t-white"></div>
-                                            <span>Downloading...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-                                            <span>Download</span>
-                                        </>
-                                    )}
-                                </button>
-
-                                {/* Stop Button - only show when downloading */}
-                                {loading && (
-                                    <button
-                                        onClick={() => {
-                                            if (typeof window !== 'undefined' && window.electronAPI?.stopDownload) {
-                                                isCancelled.current = true;
-                                                window.electronAPI.stopDownload();
-                                                setLoading(false);
-                                                setProgress(prev => ({
-                                                    ...prev,
-                                                    status: 'info',
-                                                    message: 'Download Stopped'
-                                                }));
-                                            }
-                                        }}
-                                        className="py-3 px-6 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 text-white hover:shadow-lg hover:shadow-red-500/20"
-                                    >
-                                        <X className="w-4 h-4 sm:w-5 sm:h-5" />
-                                        <span className="hidden sm:inline">Stop</span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
+                        <DownloadButton
+                            loading={loading}
+                            url={url}
+                            onDownload={handleDownload}
+                            onStop={() => {
+                                if (typeof window !== 'undefined' && window.electronAPI?.stopDownload) {
+                                    isCancelled.current = true;
+                                    window.electronAPI.stopDownload();
+                                    setLoading(false);
+                                    setProgress(prev => ({
+                                        ...prev,
+                                        status: 'info',
+                                        message: 'Download Stopped'
+                                    }));
+                                }
+                            }}
+                        />
 
 
                         {/* Advanced Options */}
@@ -657,6 +648,10 @@ export default function Home() {
                             }}
                             currentColors={colors}
                         />
+                        <Info 
+                            show={showInfo}
+                            onClose={() => setShowInfo(false)}
+                        />
 
                         {/* Progress Bar - Always show if there's any progress data */}
                         <div className="w-full mt-6">
@@ -664,23 +659,7 @@ export default function Home() {
                         </div>
 
                         {/* Results and Errors */}
-                        <div className="w-full mt-6 space-y-4">
-                            {result && (
-                                <div className="p-4 bg-green-900/30 border border-green-800/50 rounded-xl">
-                                    <p className="text-green-400 font-medium">
-                                        <span className="font-bold">Success:</span> {result}
-                                    </p>
-                                </div>
-                            )}
-
-                            {error && (
-                                <div className="p-4 bg-red-900/30 border border-red-800/50 rounded-xl">
-                                    <p className="text-red-400 font-medium">
-                                        <span className="font-bold">Error:</span> {error}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
+                        <StatusMessage result={result || ''} error={error || ''} />
                         <Footer />
                     </div>
                 </div>

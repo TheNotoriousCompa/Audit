@@ -35,7 +35,7 @@
     "electron-squirrel-startup": "^1.0.1",
     "formidable": "^3.5.4",
     "lucide-react": "^0.544.0",
-    "next": "15.5.4",
+    "next": "15.5.7",
     "ogl": "^1.0.11",
     "ogl-typescript": "^0.1.40",
     "react": "19.1.0",

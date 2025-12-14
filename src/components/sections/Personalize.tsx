@@ -41,7 +41,7 @@ const Personalize: React.FC<PersonalizeProps> = ({
   };
 
   const resetToDefault = (type: 'lineColor' | 'backgroundColor') => {
-    const defaultValue = type === 'lineColor' ? '#c2c1c0' : '#000000';
+    const defaultValue = type === 'lineColor' ? '#50C878' : '#000000';
     handleColorChange(type, defaultValue);
   };
 

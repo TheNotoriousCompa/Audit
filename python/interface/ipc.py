@@ -1,26 +1,32 @@
-"""
-Inter-process communication with Electron frontend.
-"""
+"""Inter-process communication with Electron frontend."""
 import sys
 import json
+import os
 import logging
-from typing import Dict, Any, Optional, Callable
+from typing import Any, Callable, Dict, Optional, Union
 
-from .log import ProgressReporter, format_progress
+from .log import ProgressReporter, format_progress, setup_logging
+from downloader.progress import ProgressCalculator
 
+# Configure root logging once and get a module-specific logger
+setup_logging()
 logger = logging.getLogger(__name__)
 
 class IPC:
     """Handles communication with the Electron frontend."""
     
     def __init__(self):
-        self.progress_callback = None
+        self.progress_calculator = ProgressCalculator()
+        # Detect if we're running under Electron
+        self.is_electron = self._check_electron()
+
+    def _check_electron(self) -> bool:
+        """Return True if the process is running under Electron."""
         # Check if we're running under Electron by looking for ELECTRON_RUN_AS_NODE env var
         # or if parent process contains 'electron'
-        import os
-        self.is_electron = (
+        return (
             os.environ.get('ELECTRON_RUN_AS_NODE') is not None or
-            (hasattr(sys, 'executable') and 'electron' in sys.executable.lower())
+            (hasattr(sys, 'executable') and 'electron' in str(sys.executable).lower())
         )
     
     def setup_progress_callback(self, callback: Optional[Callable] = None) -> ProgressReporter:
@@ -66,28 +72,36 @@ class IPC:
             print(json.dumps(error_message), flush=True)
             logger.error(f"Progress handler error: {e}", exc_info=True)
     
-    def send_result(self, success: bool, message: str = None, output_path: str = None, error: str = None, **kwargs):
-        """
-        Send a result message to the frontend.
-        
-        Args:
-            success: Whether the operation was successful
-            message: Optional success/status message
-            output_path: Path to the downloaded file(s)
-            error: Error message if the operation failed
-            **kwargs: Additional result data
-        """
+    def send_result(self, success: bool, message: str = '', output_path: str = None, error: str = None) -> None:
+        """Send a result back to the frontend."""
+        if not self.is_electron:
+            return
+            
         result = {
             'type': 'result',
-            'data': {
-                'success': success,
-                'message': message or '',
-                'output_path': output_path or '',
-                'error': error or '',
-                **kwargs
-            }
+            'success': success,
+            'message': message or '',
+            'outputPath': output_path or '',
+            'error': error or ''
         }
-        print('\n' + json.dumps(result), flush=True)
+        print(json.dumps(result))
+        sys.stdout.flush()
+        
+    def send_progress(self, progress_data: Dict[str, Any]) -> None:
+        """Send progress update to the frontend.
+        
+        Args:
+            progress_data: Dictionary containing progress information
+        """
+        if not self.is_electron:
+            return
+            
+        message = {
+            'type': 'progress',
+            'data': progress_data
+        }
+        print(json.dumps(message))
+        sys.stdout.flush()
     
     def read_input(self):
         """Read input from stdin (Electron) or command line."""
@@ -124,8 +138,17 @@ class IPC:
                     data = message.get('data', {})
                     
                     if message_type == 'download':
+                        # Handle download message
+                        if data.get('reset_progress', False):
+                            self.progress_calculator.reset_state()
+                            
                         success, output_path, message = process_func(data)
                         self.send_result(success, message, str(output_path) if output_path else None)
+                        
+                    elif message_type == 'progress':
+                        # Process progress update through the calculator
+                        progress_data = self.progress_calculator.calculate_progress(data)
+                        self.send_progress(progress_data)
                         
                 except json.JSONDecodeError as e:
                     logger.error(f"Invalid message format: {e}")

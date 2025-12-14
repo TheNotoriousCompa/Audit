@@ -7,7 +7,7 @@ interface BackgroundProps {
 }
 
 const Background: React.FC<BackgroundProps> = ({
-  lineColor = '#c2c1c0',
+  lineColor = '#10601e',
   backgroundColor = 'rgba(0, 0, 0, 1)'
 }) => (
   <Waves

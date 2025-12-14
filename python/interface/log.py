@@ -55,14 +55,18 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         # Calculate percentage
-        percentage = 0
-        if data.get('_percent_str'):
+        # Se il ProgressCalculator ha già calcolato "percentage", usiamo quello
+        percentage = 0.0
+        if data.get('percentage') is not None:
+            try:
+                percentage = float(data.get('percentage', 0))
+            except (ValueError, TypeError):
+                percentage = 0.0
+        elif data.get('_percent_str'):
             try:
                 percentage = float(str(data['_percent_str']).replace('%', '').strip())
             except (ValueError, AttributeError):
-                percentage = 0
-        elif data.get('percentage') is not None:
-            percentage = float(data.get('percentage', 0))
+                percentage = 0.0
         
         # Parse ETA - convert from string to seconds if needed
         eta = 0
@@ -83,21 +87,8 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
             secs = eta % 60
             eta_str = f"{mins}:{secs:02d}"
         
-        # Determine status
-        status = data.get('status', 'downloading')
-        
-        # Map Python yt-dlp status to our status types
-        if status == 'downloading':
-            status = 'downloading'
-        elif status == 'finished':
-            status = 'finished'
-            percentage = 100
-        elif status == 'error':
-            status = 'error'
-        elif percentage > 0 and percentage < 100:
-            status = 'downloading'
-        elif percentage >= 100:
-            status = 'finished'
+        # Determine status: fidiamoci dello status passato (già normalizzato dal backend)
+        status = str(data.get('status', 'downloading'))
         
         # Get file sizes
         downloaded_bytes = int(data.get('downloaded_bytes') or data.get('downloaded') or 0)
@@ -113,6 +104,16 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
         elif data.get('currentFile'):
             current_file = str(data['currentFile'])
         
+        # Percentuali esplicite dal ProgressCalculator (se presenti)
+        file_percent = float(data.get('file_percent', percentage))
+        playlist_percent = float(data.get('playlist_percent', 0))
+
+        # Playlist metadata
+        playlist_index = int(data.get('playlist_index', 0))
+        playlist_count = int(data.get('playlist_count', 0))
+        playlist_name = str(data.get('playlist_name', ''))
+        is_playlist = bool(data.get('isPlaylist') or playlist_count > 0)
+
         # Format the response to match TypeScript interface
         formatted = {
             'status': status,
@@ -130,10 +131,14 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
             'currentFile': current_file,
             'filename': current_file,
             # Playlist fields
-            'playlist_index': int(data.get('playlist_index', 0)),
-            'playlist_count': int(data.get('playlist_count', 0)),
-            'playlist_name': str(data.get('playlist_name', '')),
-            'total_playlist_eta': int(data.get('total_playlist_eta', 0))
+            'playlist_index': playlist_index,
+            'playlist_count': playlist_count,
+            'playlist_name': playlist_name,
+            'total_playlist_eta': int(data.get('total_playlist_eta', 0)),
+            'isPlaylist': is_playlist,
+            # Percentuali dettagliate
+            'file_percent': file_percent,
+            'playlist_percent': playlist_percent,
         }
         
         return formatted
