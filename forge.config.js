@@ -88,6 +88,19 @@ const config = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'TheNotoriousCompa',
+          name: 'Audit'
+        },
+        prerelease: false,
+        draft: true
+      }
+    }
+  ]
 };
 
 export default config;

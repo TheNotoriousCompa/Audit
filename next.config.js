@@ -6,8 +6,8 @@ const nextConfig = {
   output: "export",
   distDir: "dist/renderer",
   images: { unoptimized: true },
-  trailingSlash: true,
-  assetPrefix: "./", // <---- AGGIUNGI QUESTO
+  // trailingSlash: true, // Disabilitato per evitare problemi con i percorsi relativi in Electron
+  assetPrefix: "./",
 
   webpack: (config, { isServer }) => {
     config.plugins = config.plugins || [];

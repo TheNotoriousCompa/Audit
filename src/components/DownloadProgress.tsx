@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Download, Music, AlertCircle, CheckCircle2, FileAudio, Folder } from 'lucide-react';
 import type { DownloadProgress as DownloadProgressType } from '@/types/electron';
@@ -20,20 +19,17 @@ const DownloadProgressComponent: React.FC<DownloadProgressProps> = ({ progress }
   const isPlaylist = internalProgress.isPlaylist;
   const status = internalProgress.status || 'starting';
   const speed = internalProgress.speed_str || internalProgress._speed_str || '0 B/s';
-  
+
   // Get progress values, ensuring they're within 0-100 range
   const filePercent = Math.min(100, Math.max(0, internalProgress.file_percent || 0));
   const playlistPercent = Math.min(100, Math.max(0, internalProgress.playlist_percent || 0));
   const displayPercent = isPlaylist ? playlistPercent : filePercent;
-  
+
   // Get file and playlist info
   const currentFile = internalProgress.filename || internalProgress.currentFile || '';
   const playlistName = internalProgress.playlistName;
   const currentItem = Math.max(1, internalProgress.currentItem || 0);
   const totalItems = Math.max(1, internalProgress.totalItems || 0);
-  
-  // Get ETA string
-  const etaStr = internalProgress._eta_str || '--:--';
 
   // Determine status color and icon
   const getStatusInfo = () => {
@@ -111,8 +107,8 @@ const DownloadProgressComponent: React.FC<DownloadProgressProps> = ({ progress }
                       <span className="text-blue-300 font-mono">{filePercent.toFixed(0)}%</span>
                     </div>
                     <div className="h-1.5 bg-gray-800/50 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-500 transition-all duration-300"
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-300"
                         style={{ width: `${filePercent}%` }}
                       />
                     </div>
@@ -131,12 +127,12 @@ const DownloadProgressComponent: React.FC<DownloadProgressProps> = ({ progress }
                   {status === 'downloading' && isPlaylist && (
                     <div className="w-full flex items-center gap-2">
                       <div className="h-1.5 bg-gray-800/50 rounded-full flex-1 overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-500 transition-all duration-300"
+                        <div
+                          className="h-full bg-emerald-500 transition-all duration-300"
                           style={{ width: `${filePercent}%` }}
                         />
                       </div>
-                      <span className="text-xs text-blue-300 font-mono w-10 text-right">
+                      <span className="text-xs text-emerald-300 font-mono w-10 text-right">
                         {filePercent.toFixed(0)}%
                       </span>
                     </div>
@@ -147,58 +143,52 @@ const DownloadProgressComponent: React.FC<DownloadProgressProps> = ({ progress }
           </div>
         </div>
 
-        {/* Status + Big Percentage on the right */}
+        {/* Status on the right (REMOVED as requested) */}
         <div className="flex flex-col items-end">
-          {status !== 'info' && (
-            <div className="text-2xl font-bold text-white tabular-nums tracking-tight mb-1">
-              {displayPercent.toFixed(0)}%
-            </div>
-          )}
-          <div className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/5 border border-white/10 ${color}`}>
-            {status}
-          </div>
         </div>
       </div>
 
-      {/* Main Progress Bar - Show for downloading status and only for playlists */}
-      {status === 'downloading' && isPlaylist && (
-        <div className="relative h-2.5 bg-gray-800/30 rounded-full overflow-hidden mb-3 border border-white/5">
-          {/* Background gradient */}
-          <div className="absolute inset-0 bg-linear-to-r from-blue-500/10 via-blue-400/10 to-blue-500/10 opacity-30" />
-          
-          {/* Progress indicator semplice */}
-          <div
-            className={`absolute left-0 top-0 h-full ${bg} transition-all duration-300 ease-out`}
-            style={{ 
-              width: `${displayPercent}%`,
-              background: 'linear-gradient(90deg, #3b82f6, #6366f1)'
-            }}
-          />
-        </div>
-      )}
-
       {/* Stats Row - Show for downloading status */}
       {status === 'downloading' && (
-        <div className="grid grid-cols-3 gap-2 text-center text-xs text-gray-400">
+        <div className="grid grid-cols-3 gap-2 text-center text-xs text-gray-400 mb-3">
           <div className="bg-white/5 rounded-lg p-2 border border-white/5">
             <div className="text-[10px] uppercase tracking-wider opacity-60 mb-1">Speed</div>
             <div className="font-bold text-white tabular-nums text-sm">{speed}</div>
           </div>
           <div className="bg-white/5 rounded-lg p-2 border border-white/5">
-            <div className="text-[10px] uppercase tracking-wider opacity-60 mb-1">ETA</div>
-            <div className="font-bold text-white tabular-nums text-sm">{etaStr}</div>
+            <div className="text-[10px] uppercase tracking-wider opacity-60 mb-1">Percentage</div>
+            <div className="font-bold text-white tabular-nums text-sm">
+              {isPlaylist ?
+                `${playlistPercent.toFixed(0)}%` :
+                `${filePercent.toFixed(0)}%`
+              }
+            </div>
           </div>
           <div className="bg-white/5 rounded-lg p-2 border border-white/5">
             <div className="text-[10px] uppercase tracking-wider opacity-60 mb-1">
               {isPlaylist ? 'Playlist' : 'Progress'}
             </div>
             <div className="font-bold text-white tabular-nums text-sm">
-              {isPlaylist ? 
-                `${currentItem}/${totalItems}` : 
+              {isPlaylist ?
+                `${currentItem}/${totalItems}` :
                 `${filePercent.toFixed(0)}%`
               }
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Main Progress Bar - General Progress (Moved to bottom) */}
+      {status === 'downloading' && (
+        <div className="relative h-2.5 bg-gray-800/30 rounded-full overflow-hidden mb-1 border border-white/5">
+          <div className="absolute inset-0 bg-linear-to-r from-emerald-500/10 via-emerald-400/10 to-emerald-500/10 opacity-30" />
+          <div
+            className={`absolute left-0 top-0 h-full ${bg} transition-all duration-300 ease-out`}
+            style={{
+              width: `${displayPercent}%`,
+              background: 'linear-gradient(90deg, #50C878, #45b069)'
+            }}
+          />
         </div>
       )}
 

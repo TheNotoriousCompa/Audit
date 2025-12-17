@@ -4,6 +4,11 @@ import path from "path";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 import isDev from "electron-is-dev";
 import type { DownloadOptions, DownloadResult } from '../types/electron';
+// Handle creating/removing shortcuts on Windows when installing/uninstalling.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+if (require('electron-squirrel-startup')) {
+  app.quit();
+}
 
 // Define local types
 type PythonProcess = ChildProcessWithoutNullStreams & {
@@ -63,9 +68,15 @@ function createWindow() {
   console.log('Final preload path:', preloadPath);
   console.log('preload file exists:', fs.existsSync(preloadPath));
 
+  const iconPath = path.join(__dirname, '..', '..', 'Public', 'AUDIT.png');
+  console.log('Icon path:', iconPath);
+  console.log('Icon exists:', fs.existsSync(iconPath));
+
+
   mainWindow = new BrowserWindow({
     width: 900,
     height: 700,
+    icon: iconPath,
     transparent: true,
     frame: false,
     titleBarStyle: "hiddenInset",
@@ -240,8 +251,8 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
 
           if (parsed.type === 'progress' && parsed.data) {
             const progressData = parsed.data;
-            const isPlaylist = Boolean(progressData.isPlaylist || 
-                                     (progressData.playlist_count && progressData.playlist_count > 0));
+            const isPlaylist = Boolean(progressData.isPlaylist ||
+              (progressData.playlist_count && progressData.playlist_count > 0));
 
             // Calculate main percentage based on download type
             let mainPercentage = 0;
@@ -255,7 +266,7 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
               // Core status
               status: String(progressData.status || 'downloading'),
               percentage: mainPercentage,
-              
+
               // File information
               downloaded: Number(progressData.downloaded_bytes || 0),
               total: Number(progressData.total_bytes || 0),
@@ -265,28 +276,28 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
               currentFile: progressData.filename
                 ? String(progressData.filename).split(/[/\\]/).pop()
                 : (progressData.currentFile ? String(progressData.currentFile) : ''),
-              
+
               // Progress details
               speed: String(progressData._speed_str || '0 B/s'),
               eta: Number(progressData.eta || 0),
               message: String(progressData.message || ''),
-              
+
               // Formatted strings
               _percent_str: String(progressData._percent_str || '0%'),
               _speed_str: String(progressData._speed_str || '0 B/s'),
               _eta_str: String(progressData._eta_str || '--:--'),
-              
+
               // Playlist information
               isPlaylist,
               currentItem: Number(progressData.playlist_index || 0),
               totalItems: Number(progressData.playlist_count || 0),
               playlistName: String(progressData.playlist_name || ''),
-              
+
               // Progress percentages
-              file_percent: Number(progressData.file_percent || 
-                                 (progressData.status === 'finished' ? 100 : 0)),
-              playlist_percent: Number(progressData.playlist_percent || 
-                                     (isPlaylist && progressData.status === 'finished' ? 100 : 0))
+              file_percent: Number(progressData.file_percent ||
+                (progressData.status === 'finished' ? 100 : 0)),
+              playlist_percent: Number(progressData.playlist_percent ||
+                (isPlaylist && progressData.status === 'finished' ? 100 : 0))
             };
 
             console.log('[PROGRESS UPDATE]', {
@@ -342,8 +353,8 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
 
           if (parsed.type === 'progress' && parsed.data) {
             const progressData = parsed.data;
-            const isPlaylist = Boolean(progressData.isPlaylist || 
-                                     (progressData.playlist_count && progressData.playlist_count > 0));
+            const isPlaylist = Boolean(progressData.isPlaylist ||
+              (progressData.playlist_count && progressData.playlist_count > 0));
 
             // Calculate main percentage based on download type
             let mainPercentage = 0;
@@ -357,7 +368,7 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
               // Core status
               status: String(progressData.status || 'downloading'),
               percentage: mainPercentage,
-              
+
               // File information
               downloaded: Number(progressData.downloaded_bytes || 0),
               total: Number(progressData.total_bytes || 0),
@@ -367,28 +378,28 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
               currentFile: progressData.filename
                 ? String(progressData.filename).split(/[/\\]/).pop()
                 : (progressData.currentFile ? String(progressData.currentFile) : ''),
-              
+
               // Progress details
               speed: String(progressData._speed_str || '0 B/s'),
               eta: Number(progressData.eta || 0),
               message: String(progressData.message || ''),
-              
+
               // Formatted strings
               _percent_str: String(progressData._percent_str || '0%'),
               _speed_str: String(progressData._speed_str || '0 B/s'),
               _eta_str: String(progressData._eta_str || '--:--'),
-              
+
               // Playlist information
               isPlaylist,
               currentItem: Number(progressData.playlist_index || 0),
               totalItems: Number(progressData.playlist_count || 0),
               playlistName: String(progressData.playlist_name || ''),
-              
+
               // Progress percentages
-              file_percent: Number(progressData.file_percent || 
-                                 (progressData.status === 'finished' ? 100 : 0)),
-              playlist_percent: Number(progressData.playlist_percent || 
-                                     (isPlaylist && progressData.status === 'finished' ? 100 : 0))
+              file_percent: Number(progressData.file_percent ||
+                (progressData.status === 'finished' ? 100 : 0)),
+              playlist_percent: Number(progressData.playlist_percent ||
+                (isPlaylist && progressData.status === 'finished' ? 100 : 0))
             };
 
             console.log('[PROGRESS UPDATE FROM STDERR]', {

@@ -77,6 +77,41 @@ def check_ffmpeg():
     logger.info("or place ffmpeg.exe in the same directory as this script")
     return None
 
+def _extract_artist(info: dict) -> str:
+    """Extract artist information from video/audio metadata."""
+    # 1. Try direct artist field
+    if info.get('artist'):
+        return info['artist']
+    
+    # 2. Try uploader (channel name)
+    if info.get('uploader'):
+        return info['uploader']
+    
+    # 3. Try to extract from title (common format: "Artist - Song")
+    if 'title' in info and ' - ' in info['title']:
+        return info['title'].split(' - ')[0].strip()
+    
+    # 4. Try to extract from description
+    if info.get('description'):
+        import re
+        # Common patterns in descriptions
+        patterns = [
+            r'(?i)artist[:]\s*([^\n]+)',
+            r'(?i)artista[:]\s*([^\n]+)',
+            r'(?i)by\s+([^\n]+)',
+            r'(?i)da\s+([^\n]+)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, info['description'])
+            if match:
+                artist = match.group(1).strip()
+                if artist:  # Make sure we found something
+                    return artist
+    
+    # 5. Last resort: return empty string
+    return ''
+
 def _process_metadata(file_path: Path, info: dict, progress_callback: Optional[Callable] = None):
     """Process metadata for a downloaded file."""
     try:
@@ -128,13 +163,22 @@ def _process_metadata(file_path: Path, info: dict, progress_callback: Optional[C
             except Exception:
                 pass
         
+        # Extract artist information
+        artist = _extract_artist(info)
+        album_artist = info.get('artist') or artist or info.get('uploader', '')
+        
+        # Log per debug
+        logger.info(f"Processing metadata for: {info.get('title', 'Unknown')}")
+        logger.info(f"Artist: {artist}, Uploader: {info.get('uploader', 'Not found')}")
+        logger.info(f"Album: {info.get('album', 'Not found')}, Album Artist: {album_artist}")
+        
         # Process metadata with all available info
         set_mp3_metadata(
             file_path=file_path,
             title=info.get('title', ''),
-            artist=info.get('uploader', ''),
+            artist=artist,
             album=info.get('album', ''),
-            album_artist=info.get('artist', info.get('uploader', '')),
+            album_artist=album_artist,
             track_number=int(info.get('track_number', 0)) if info.get('track_number') else 0,
             year=str(info.get('release_year') or info.get('release_date', '')[:4] if info.get('release_date') else ''),
             genre=', '.join(info.get('genres', [])) if info.get('genres') else '',
@@ -347,7 +391,13 @@ def download_media(
                                 entry['webpage_url'] = info['url']
                             if 'uploader' not in entry and 'uploader' in info:
                                 entry['uploader'] = info['uploader']
-                                
+                            if 'artist' not in entry and 'artist' in info:
+                                entry['artist'] = info['artist']
+                            
+                            # Add playlist title as album if not set
+                            if 'album' not in entry and 'playlist' in info and info.get('playlist'):
+                                entry['album'] = info.get('playlist_title', 'YouTube Playlist')
+                            
                             _process_metadata(downloaded_file, entry, progress_callback)
                             # logger.info removed to avoid Unicode errors on Windows
                             

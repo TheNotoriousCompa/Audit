@@ -1,18 +1,23 @@
 {
-  "name": "audit-app",
-  "version": "0.1.1",
+  "name": "ytmp3-next",
+  "version": "1.2.0",
   "private": true,
+  "productName": "Audit",
   "main": "./dist/main/main.js",
   "author": "<MC/>",
-  "description": "Youtube video converter",
+  "description": "YouTube to MP3 Converter",
   "license": "MIT License",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TheNotoriousCompa/Audit"
+  },
   "scripts": {
     "restart": "pkill -f 'node server.js' && npm run dev",
     "dev:renderer": "next dev",
     "dev:electron": "electron .",
     "build:renderer": "next build",
     "build:main": "rimraf dist/main && tsc -p tsconfig.main.json",
-    "build:preload": "rimraf dist/preload && tsc -p tsconfig.preload.json && copyfiles -u 1 src/main/preload.js dist/preload/",
+    "build:preload": "rimraf dist/preload && tsc -p tsconfig.preload.json",
     "build": "npm run clean && npm run build:main && npm run build:preload && npm run build:renderer && npm run postbuild",
     "clean": "rimraf dist",
     "postbuild": "node -e \"const fs = require('fs'); fs.mkdirSync('dist/preload', { recursive: true }); fs.writeFileSync('dist/preload/package.json', JSON.stringify({ type: 'commonjs' })); fs.mkdirSync('dist/main', { recursive: true }); fs.writeFileSync('dist/main/package.json', JSON.stringify({ type: 'commonjs' }));\"",
@@ -24,6 +29,7 @@
     "postinstall": "electron-builder install-app-deps",
     "package": "electron-forge package",
     "make": "electron-forge make",
+    "publish": "electron-forge publish",
     "build:all": "npm run build && npm run make",
     "export:renderer": "next build && next export -o dist/exported"
   },

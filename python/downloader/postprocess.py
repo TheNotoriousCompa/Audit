@@ -12,7 +12,7 @@ from typing import Optional
 
 import mutagen
 import requests
-from mutagen.id3 import ID3, APIC
+from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB, TPE2, TRCK, TYER, TCON, COMM
 from mutagen.mp3 import EasyMP3
 from PIL import Image
 
@@ -78,55 +78,67 @@ def set_mp3_metadata(
     """Set or update metadata (including artwork) for an MP3 file."""
     try:
         if not file_path.exists():
+            logger.warning(f"File not found: {file_path}")
             return False
 
         file_str = str(file_path)
+        logger.debug(f"Setting metadata for {file_path}")
 
-        # --- ID3 block for artwork ---
+        # Initialize ID3 tags
         try:
             tags = ID3(file_str)
+            # Remove all existing tags to avoid duplicates
+            for tag in list(tags.keys()):
+                del tags[tag]
         except mutagen.id3.ID3NoHeaderError:
             tags = ID3()
 
+        # Add artwork if available
         if artwork:
-            tags.delall("APIC")
-            tags.add(
-                APIC(
-                    encoding=3,
-                    mime="image/jpeg",
-                    type=3,
-                    desc="Cover",
-                    data=artwork,
+            try:
+                tags.add(
+                    APIC(
+                        encoding=3,  # UTF-8
+                        mime="image/jpeg",
+                        type=3,  # Cover image
+                        desc="Cover",
+                        data=artwork,
+                    )
                 )
-            )
+                logger.debug("Added artwork to metadata")
+            except Exception as e:
+                logger.error(f"Error adding artwork: {str(e)}", exc_info=True)
 
-        tags.save(file_str, v2_version=3)
-
-        # --- EasyMP3 block for text tags ---
+        # Add text tags
         try:
-            audio = EasyMP3(file_str)
             if title:
-                audio["title"] = title
+                tags.add(TIT2(encoding=3, text=title))
             if artist:
-                audio["artist"] = artist
+                tags.add(TPE1(encoding=3, text=artist))
             if album:
-                audio["album"] = album
+                tags.add(TALB(encoding=3, text=album))
             if album_artist:
-                audio["albumartist"] = album_artist
+                tags.add(TPE2(encoding=3, text=album_artist))
             if track_number:
-                audio["tracknumber"] = str(track_number)
+                tags.add(TRCK(encoding=3, text=str(track_number)))
             if year:
-                audio["date"] = year
+                tags.add(TYER(encoding=3, text=year))
             if genre:
-                audio["genre"] = genre
+                tags.add(TCON(encoding=3, text=genre))
             if comment:
-                audio["comment"] = comment
-
-            audio.save(v2_version=3)
-        except Exception:
+                tags.add(COMM(encoding=3, text=comment, lang='eng', desc=''))
+            
+            logger.debug(f"Tags to save: {tags.pprint()}")
+            
+            # Save all tags
+            tags.save(file_str, v2_version=3)
+            logger.info(f"Successfully saved metadata for {file_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error adding text tags: {str(e)}", exc_info=True)
             return False
 
-        return True
-
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error setting metadata for {file_path}: {str(e)}", exc_info=True)
         return False

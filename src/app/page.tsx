@@ -29,7 +29,7 @@ export default function Home() {
     // Load colors from localStorage on component mount
     const [colors, setColors] = useState(() => {
         if (typeof window !== 'undefined') {
-            const savedColors = localStorage.getItem('waveColors');
+            const savedColors = localStorage.getItem('waveColors_v2');
             return savedColors
                 ? JSON.parse(savedColors)
                 : { lineColor: '#50C878', backgroundColor: '#000000' };
@@ -40,7 +40,7 @@ export default function Home() {
     // Save colors to localStorage whenever they change
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            localStorage.setItem('waveColors', JSON.stringify(colors));
+            localStorage.setItem('waveColors_v2', JSON.stringify(colors));
         }
     }, [colors]);
 
@@ -104,7 +104,7 @@ export default function Home() {
                     speed_raw: 0,
                     timestamp: Date.now()
                 });
-                
+
                 // Reset form state
                 setUrl('');
                 setResult(null);
@@ -473,21 +473,22 @@ export default function Home() {
 
             {/* Draggable Header with Native Window Controls */}
             <div
-                className="absolute top-0 left-0 right-0 h-10 flex items-center justify-end px-4 bg-transparent z-50"
+                className="absolute top-2 left-2 right-2 h-10 flex items-center justify-between px-3 bg-black/30 z-50 backdrop-blur-md rounded-xl shadow-lg shadow-black/20"
                 style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             >
-                {/* Window Controls - Not draggable */}
-                <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} className="flex items-center space-x-4 pr-2">
+
+                {/* App Controls - Left Side */}
+                <div style={{ WebkitAppRegion: 'no-drag' }} className="flex items-center space-x-2 group">
                     <button
                         onClick={() => {
                             setShowAdvanced(!showAdvanced);
                             if (showPersonalize) setShowPersonalize(false);
                             if (showInfo) setShowInfo(false);
                         }}
-                        className={`p-1.5 rounded-lg transition-colors ${showAdvanced ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                        className={`p-1.5 rounded-lg transition-colors hover:text-emerald-500 ${showAdvanced ? 'bg-white/10 text-emerald-500' : 'hover:bg-white/5'}`}
                         title="Advanced Options"
                     >
-                        <Settings className="w-5 h-5 text-gray-300" />
+                        <Settings className="w-5 h-5 text-gray-300 hover:text-emerald-500 transition-colors" />
                     </button>
                     <button
                         onClick={() => {
@@ -495,10 +496,10 @@ export default function Home() {
                             if (showAdvanced) setShowAdvanced(false);
                             if (showInfo) setShowInfo(false);
                         }}
-                        className={`p-1.5 rounded-lg transition-colors ${showPersonalize ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                        className={`p-1.5 rounded-lg transition-colors hover:text-emerald-500 ${showPersonalize ? 'bg-white/10 text-emerald-500' : 'hover:bg-white/5'}`}
                         title="Personalize"
                     >
-                        <Palette className="w-5 h-5 text-gray-300" />
+                        <Palette className="w-5 h-5 text-gray-300 hover:text-emerald-500 transition-colors" />
                     </button>
                     <button
                         onClick={() => {
@@ -506,21 +507,25 @@ export default function Home() {
                             if (showAdvanced) setShowAdvanced(false);
                             if (showPersonalize) setShowPersonalize(false);
                         }}
-                        className={`p-1.5 rounded-lg transition-colors ${showInfo ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                        className={`p-1.5 rounded-lg transition-colors hover:text-emerald-500 ${showInfo ? 'bg-white/10 text-emerald-500' : 'hover:bg-white/5'}`}
                         title="Info"
                     >
-                        <InfoIcon className="w-5 h-5 text-gray-300" />
+                        <InfoIcon className="w-5 h-5 text-gray-300 hover:text-emerald-500 transition-colors" />
                     </button>
+                </div>
+
+                {/* Window Controls - Right Side */}
+                <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} className="flex items-center space-x-4">
                     <button
                         onClick={() => window.electronAPI?.windowMinimize?.()}
-                        className="p-1 text-gray-300 hover:text-white transition-colors"
+                        className="p-1 text-gray-300 hover:text-emerald-500 transition-colors"
                         title="Minimize"
                     >
                         <Minus className="w-4 h-4" />
                     </button>
                     <button
                         onClick={() => window.electronAPI?.windowMaximize?.()}
-                        className="p-1 text-gray-300 hover:text-white transition-colors"
+                        className="p-1 text-gray-300 hover:text-emerald-500 transition-colors"
                         title="Maximize"
                     >
                         <Square className="w-3.5 h-3.5" />
@@ -648,7 +653,7 @@ export default function Home() {
                             }}
                             currentColors={colors}
                         />
-                        <Info 
+                        <Info
                             show={showInfo}
                             onClose={() => setShowInfo(false)}
                         />

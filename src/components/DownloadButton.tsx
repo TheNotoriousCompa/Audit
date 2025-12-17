@@ -20,11 +20,10 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         <button
           onClick={onDownload}
           disabled={loading || !url.trim()}
-          className={`flex-1 py-3 px-6 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
-            loading || !url.trim()
+          className={`flex-1 py-3 px-6 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${loading || !url.trim()
               ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
-              : 'bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white hover:shadow-lg hover:shadow-blue-500/20 transform hover:-translate-y-0.5'
-          }`}
+              : 'bg-[#50C878] hover:bg-[#45b069] text-white hover:shadow-lg hover:shadow-[#50C878]/30 transform hover:-translate-y-0.5'
+            }`}
         >
           {loading ? (
             <>
