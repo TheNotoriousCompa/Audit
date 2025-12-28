@@ -194,6 +194,8 @@ def download_media(
     output_dir: str,
     bitrate: int = 320,
     format: str = "mp3",
+    quality: str = "best",
+    fps: Optional[int] = None,
     process_playlist: bool = False,
     progress_callback: Optional[Callable[[str, float], None]] = None,
     max_retries: int = 3,
@@ -262,29 +264,74 @@ def download_media(
         "verbose": False,
         "no_warnings": True,
         "ignoreerrors": True,
-        "format": f"bestaudio[ext={format}]/bestaudio",  # Prioritize the requested format
-        "outtmpl": str(Path(output_dir) / f"%(title)s.{format}"),  # Force the output extension
+        "outtmpl": str(Path(output_dir) / f"%(title)s.%(ext)s"),
         "noplaylist": not process_playlist,
         "progress_hooks": [progress_wrapper],
         "writethumbnail": True,  # Download thumbnail
         "postprocessors": [],
     }
     
-    if ffmpeg_path:
-        # 1. Convert to audio format (e.g., mp3)
-        ydl_opts["postprocessors"].append({
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": format,
-            "preferredquality": str(bitrate),
-        })
-        ydl_opts["ffmpeg_location"] = str(Path(ffmpeg_path).parent)
+    # Format selection logic
+    if format == 'mp4':
+        # Video resolution and FPS logic
+        height_filter = ""
+        fps_filter = ""
+        
+        if quality and quality.lower() != 'best':
+            # Remove 'p' if present (e.g. 1080p -> 1080)
+            height = quality.lower().replace('p', '')
+            if height.isdigit():
+                 height_filter = f"[height<={height}]"
+        
+        if fps and fps > 0:
+            # If FPS is specified, prefer formats with that FPS or higher
+            fps_filter = f"[fps>={fps}]"
 
-        # 2. Embed thumbnail (must be AFTER conversion)
+        if height_filter or fps_filter:
+            # Construct complex format selector
+            # Try to get best video matching criteria, fallback to best video without criteria if needed
+            ydl_opts["format"] = f"bestvideo{height_filter}{fps_filter}+bestaudio/best{height_filter}{fps_filter}/best"
+        else:
+            ydl_opts["format"] = "bestvideo+bestaudio/best"
+            
+        # Ensure we merge into mp4
+        ydl_opts["merge_output_format"] = "mp4"
+        
+        # For MP4 we still want metadata
+        ydl_opts["postprocessors"].append({
+            "key": "FFmpegMetadata",
+            "add_metadata": True,
+        })
+        
+        # And embed thumbnail
         ydl_opts["postprocessors"].append({
             "key": "EmbedThumbnail",
         })
+
     else:
-        ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio"
+        # Audio logic (existing)
+        ydl_opts["format"] = f"bestaudio[ext={format}]/bestaudio"
+        ydl_opts["outtmpl"] = str(Path(output_dir) / f"%(title)s.{format}")  # Force the output extension
+    
+    if ffmpeg_path:
+        ydl_opts["ffmpeg_location"] = str(Path(ffmpeg_path).parent)
+        
+        # ONLY add audio conversion if NOT mp4
+        if format != 'mp4':
+            # 1. Convert to audio format (e.g., mp3)
+            ydl_opts["postprocessors"].append({
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": format,
+                "preferredquality": str(bitrate),
+            })
+
+            # 2. Embed thumbnail (must be AFTER conversion)
+            ydl_opts["postprocessors"].append({
+                "key": "EmbedThumbnail",
+            })
+    else:
+        if format != 'mp4':
+            ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio"
 
     output_path = None
     playlist_folder = None

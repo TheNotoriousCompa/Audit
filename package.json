@@ -1,6 +1,6 @@
 {
   "name": "ytmp3-next",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "productName": "Audit",
   "main": "./dist/main/main.js",
@@ -27,9 +27,9 @@
     "setup:ffmpeg": "node setup-ffmpeg.js",
     "prebuild": "npm run setup:python && npm run setup:ffmpeg",
     "postinstall": "electron-builder install-app-deps",
-    "package": "electron-forge package",
+    "package": "npm run build && electron-forge package",
     "make": "electron-forge make",
-    "publish": "electron-forge publish",
+    "publish": "npm run build && electron-forge publish",
     "build:all": "npm run build && npm run make",
     "export:renderer": "next build && next export -o dist/exported"
   },
@@ -61,6 +61,7 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron-forge/plugin-webpack": "^7.10.2",
+    "@electron-forge/publisher-github": "^7.10.2",
     "@electron/fuses": "^1.8.0",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4.1.17",

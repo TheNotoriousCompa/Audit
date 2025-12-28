@@ -1,56 +1,84 @@
 // setup-python.js
-// Script to download Python embeddable and install dependencies
+// Script to download Python for Windows (Embeddable) or Mac/Linux (Standalone)
 
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const AdmZip = require('adm-zip');
+const { pipeline } = require('stream');
+const { promisify } = require('util');
+const streamPipeline = promisify(pipeline);
 
-const PYTHON_VERSION = '3.13.0'; // Latest 3.13.x embeddable available
-const PYTHON_URL = `https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip`;
 const RUNTIME_DIR = path.join(__dirname, 'python-runtime');
-const ZIP_PATH = path.join(__dirname, 'python-embed.zip');
+const platform = process.platform;
+const arch = process.arch; // 'x64' or 'arm64'
 
-console.log('🐍 Setting up Python embeddable runtime...\n');
+// URLs
+const WIN_PYTHON_VERSION = '3.13.0';
+const WIN_URL = `https://www.python.org/ftp/python/${WIN_PYTHON_VERSION}/python-${WIN_PYTHON_VERSION}-embed-amd64.zip`;
+
+// Standalone Python builds (Indygreg) for Mac/Linux
+// Using a fixed recent version
+const STANDALONE_TAG = '20241016';
+const STANDALONE_VERSION = '3.12.7';
+
+let DOWNLOAD_URL = '';
+let DOWNLOAD_FILE = 'python-runtime.zip'; // or .tar.gz
+let IS_WINDOWS = false;
+
+if (platform === 'win32') {
+    IS_WINDOWS = true;
+    DOWNLOAD_URL = WIN_URL;
+    DOWNLOAD_FILE = 'python-embed.zip';
+} else if (platform === 'darwin') {
+    // macOS
+    // x86_64 or aarch64
+    const macArch = arch === 'arm64' ? 'aarch64' : 'x86_64';
+    // Using a build that supports generally 10.9+ or 11+
+    DOWNLOAD_URL = `https://github.com/indygreg/python-build-standalone/releases/download/${STANDALONE_TAG}/cpython-${STANDALONE_VERSION}+${STANDALONE_TAG}-${macArch}-apple-darwin-install_only.tar.gz`;
+    DOWNLOAD_FILE = 'python-runtime.tar.gz';
+} else {
+    // Assume Linux x64
+    DOWNLOAD_URL = `https://github.com/indygreg/python-build-standalone/releases/download/${STANDALONE_TAG}/cpython-${STANDALONE_VERSION}+${STANDALONE_TAG}-x86_64-unknown-linux-gnu-install_only.tar.gz`;
+    DOWNLOAD_FILE = 'python-runtime.tar.gz';
+}
+
+const FILE_PATH = path.join(__dirname, DOWNLOAD_FILE);
+
+console.log(`🐍 Setting up Python runtime for ${platform} (${arch})...\n`);
 
 // Step 1: Create runtime directory
 if (!fs.existsSync(RUNTIME_DIR)) {
     console.log('📁 Creating python-runtime directory...');
     fs.mkdirSync(RUNTIME_DIR, { recursive: true });
 } else {
+    // We might want to clean it if switching platforms, but usually this runs in clean CI
     console.log('✓ python-runtime directory already exists');
 }
 
-// Step 2: Download Python embeddable
-function downloadPython() {
+// Step 2: Download
+async function downloadPython() {
+    if (IS_WINDOWS && fs.existsSync(path.join(RUNTIME_DIR, 'python.exe'))) {
+        console.log('✓ Python already downloaded (Windows), skipping...\n');
+        return;
+    }
+    // For Mac/Linux check specific bin
+    if (!IS_WINDOWS && fs.existsSync(path.join(RUNTIME_DIR, 'bin', 'python3'))) {
+        console.log('✓ Python already downloaded (Unix), skipping...\n');
+        return;
+    }
+
+    console.log(`📥 Downloading Python...`);
+    console.log(`   URL: ${DOWNLOAD_URL}`);
+
+    const file = fs.createWriteStream(FILE_PATH);
+
     return new Promise((resolve, reject) => {
-        if (fs.existsSync(path.join(RUNTIME_DIR, 'python.exe'))) {
-            console.log('✓ Python already downloaded, skipping...\n');
-            resolve();
-            return;
-        }
-
-        console.log(`📥 Downloading Python ${PYTHON_VERSION} embeddable...`);
-        console.log(`   URL: ${PYTHON_URL}`);
-
-        const file = fs.createWriteStream(ZIP_PATH);
-
-        https.get(PYTHON_URL, (response) => {
+        https.get(DOWNLOAD_URL, response => {
             if (response.statusCode === 302 || response.statusCode === 301) {
-                // Follow redirect
-                https.get(response.headers.location, (redirectResponse) => {
-                    const totalSize = parseInt(redirectResponse.headers['content-length'], 10);
-                    let downloaded = 0;
-
-                    redirectResponse.on('data', (chunk) => {
-                        downloaded += chunk.length;
-                        const percent = ((downloaded / totalSize) * 100).toFixed(1);
-                        process.stdout.write(`\r   Progress: ${percent}%`);
-                    });
-
+                https.get(response.headers.location, redirectResponse => {
                     redirectResponse.pipe(file);
-
                     file.on('finish', () => {
                         file.close();
                         console.log('\n✓ Download complete!\n');
@@ -58,143 +86,125 @@ function downloadPython() {
                     });
                 }).on('error', reject);
             } else {
-                const totalSize = parseInt(response.headers['content-length'], 10);
-                let downloaded = 0;
-
-                response.on('data', (chunk) => {
-                    downloaded += chunk.length;
-                    const percent = ((downloaded / totalSize) * 100).toFixed(1);
-                    process.stdout.write(`\r   Progress: ${percent}%`);
-                });
-
                 response.pipe(file);
-
                 file.on('finish', () => {
                     file.close();
                     console.log('\n✓ Download complete!\n');
                     resolve();
                 });
             }
-        }).on('error', (err) => {
-            fs.unlinkSync(ZIP_PATH);
-            reject(err);
-        });
-    });
-}
-
-// Step 3: Extract Python
-function extractPython() {
-    if (fs.existsSync(path.join(RUNTIME_DIR, 'python.exe'))) {
-        console.log('✓ Python already extracted, skipping...\n');
-        return;
-    }
-
-    console.log('📦 Extracting Python...');
-    const zip = new AdmZip(ZIP_PATH);
-    zip.extractAllTo(RUNTIME_DIR, true);
-
-    // Clean up zip file
-    fs.unlinkSync(ZIP_PATH);
-    console.log('✓ Extraction complete!\n');
-}
-
-// Step 4: Configure Python paths
-function configurePython() {
-    console.log('⚙️  Configuring Python paths...');
-
-    const pthFile = path.join(RUNTIME_DIR, `python${PYTHON_VERSION.replace('.', '').substring(0, 3)}._pth`);
-
-    if (fs.existsSync(pthFile)) {
-        let content = fs.readFileSync(pthFile, 'utf8');
-
-        // Uncomment import site to enable site-packages
-        content = content.replace('#import site', 'import site');
-
-        // Add Lib/site-packages to path
-        if (!content.includes('Lib/site-packages')) {
-            content += '\nLib/site-packages\n';
-        }
-
-        fs.writeFileSync(pthFile, content);
-        console.log('✓ Python paths configured!\n');
-    }
-}
-
-// Step 5: Install get-pip
-function installPip() {
-    console.log('📦 Installing pip...');
-
-    const pipPath = path.join(RUNTIME_DIR, 'Scripts', 'pip.exe');
-    if (fs.existsSync(pipPath)) {
-        console.log('✓ pip already installed, skipping...\n');
-        return;
-    }
-
-    const getPipUrl = 'https://bootstrap.pypa.io/get-pip.py';
-    const getPipPath = path.join(RUNTIME_DIR, 'get-pip.py');
-
-    return new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(getPipPath);
-
-        https.get(getPipUrl, (response) => {
-            response.pipe(file);
-            file.on('finish', () => {
-                file.close();
-
-                // Run get-pip.py
-                const pythonExe = path.join(RUNTIME_DIR, 'python.exe');
-                try {
-                    execSync(`"${pythonExe}" "${getPipPath}"`, {
-                        stdio: 'inherit',
-                        cwd: RUNTIME_DIR
-                    });
-                    fs.unlinkSync(getPipPath);
-                    console.log('✓ pip installed!\n');
-                    resolve();
-                } catch (error) {
-                    reject(error);
-                }
-            });
         }).on('error', reject);
     });
 }
 
-// Step 6: Install dependencies
-function installDependencies() {
-    console.log('📦 Installing Python dependencies from requirements.txt...');
+// Step 3: Extract
+async function extractPython() {
+    console.log('📦 Extracting Python...');
 
-    const requirementsPath = path.join(__dirname, 'requirements.txt');
-    if (!fs.existsSync(requirementsPath)) {
-        console.log('⚠️  requirements.txt not found, skipping...\n');
+    if (IS_WINDOWS) {
+        const zip = new AdmZip(FILE_PATH);
+        zip.extractAllTo(RUNTIME_DIR, true);
+        fs.unlinkSync(FILE_PATH);
+    } else {
+        // tar.gz extraction
+        // Actions/Mac usually have tar
+        // cpython builds extract to a 'python' folder usually, or install structure
+        // We want to extract STRIP components so it goes directly into RUNTIME_DIR
+        try {
+            // The standalone builds usually extract to a 'python' folder.
+            // We'll extract to module dir first then move? Or just --strip-components
+            execSync(`tar -xzf "${FILE_PATH}" -C "${RUNTIME_DIR}" --strip-components=1`);
+            fs.unlinkSync(FILE_PATH);
+        } catch (e) {
+            console.error(e);
+            throw new Error('Failed to extract tar.gz');
+        }
+    }
+    console.log('✓ Extraction complete!\n');
+}
+
+// Step 4: Configure (Windows only mainly)
+function configurePython() {
+    if (!IS_WINDOWS) {
+        // Unix standalone builds are usually self-contained and ready
         return;
     }
-
-    const pythonExe = path.join(RUNTIME_DIR, 'python.exe');
-    const pipExe = path.join(RUNTIME_DIR, 'Scripts', 'pip.exe');
-
-    try {
-        execSync(`"${pipExe}" install -r "${requirementsPath}" --target "${path.join(RUNTIME_DIR, 'Lib', 'site-packages')}"`, {
-            stdio: 'inherit'
-        });
-        console.log('✓ Dependencies installed!\n');
-    } catch (error) {
-        console.error('❌ Failed to install dependencies:', error.message);
-        throw error;
+    console.log('⚙️  Configuring Python paths (Windows)...');
+    // ... existing windows pth logic ...
+    const pthFile = path.join(RUNTIME_DIR, `python${WIN_PYTHON_VERSION.replace('.', '').substring(0, 3)}._pth`);
+    if (fs.existsSync(pthFile)) {
+        let content = fs.readFileSync(pthFile, 'utf8');
+        content = content.replace('#import site', 'import site');
+        if (!content.includes('Lib/site-packages')) {
+            content += '\nLib/site-packages\n';
+        }
+        fs.writeFileSync(pthFile, content);
     }
 }
 
-// Main execution
+// Step 5: Install pip/Utils
+async function postInstall() {
+    console.log('⚙️  Running post-install setup...');
+
+    const pythonBin = IS_WINDOWS
+        ? path.join(RUNTIME_DIR, 'python.exe')
+        : path.join(RUNTIME_DIR, 'bin', 'python3');
+
+    // Ensure executable on Unix
+    if (!IS_WINDOWS) {
+        execSync(`chmod +x "${pythonBin}"`);
+    }
+
+    // Install Pip for Windows (Unix builds usually have it or ensurepip)
+    if (IS_WINDOWS) {
+        // ... existing pip install logic ...
+        const getPipUrl = 'https://bootstrap.pypa.io/get-pip.py';
+        const getPipPath = path.join(RUNTIME_DIR, 'get-pip.py');
+
+        const pipeC = fs.createWriteStream(getPipPath);
+        await new Promise((resolve, reject) => {
+            https.get(getPipUrl, res => {
+                res.pipe(pipeC);
+                pipeC.on('finish', resolve);
+            }).on('error', reject);
+        });
+
+        execSync(`"${pythonBin}" "${getPipPath}"`, { stdio: 'inherit', cwd: RUNTIME_DIR });
+        fs.unlinkSync(getPipPath);
+    }
+
+    // Install requirements
+    const reqPath = path.join(__dirname, 'requirements.txt');
+    if (fs.existsSync(reqPath)) {
+        console.log('📦 Installing requirements...');
+        const pipArgs = IS_WINDOWS
+            ? ['install', '-r', reqPath, '--target', path.join(RUNTIME_DIR, 'Lib', 'site-packages')]
+            : ['install', '-r', reqPath]; // Standalone python handles site-packages automatically if we use its pip
+        // However, for standalone build we might need to invoke its pip module
+
+        if (IS_WINDOWS) {
+            const pipExe = path.join(RUNTIME_DIR, 'Scripts', 'pip.exe');
+            execSync(`"${pipExe}" ${pipArgs.join(' ')}`, { stdio: 'inherit' });
+        } else {
+            // Unix: use python -m pip
+            execSync(`"${pythonBin}" -m pip ${pipArgs.join(' ')}`, { stdio: 'inherit' });
+        }
+    }
+}
+
 async function main() {
     try {
         await downloadPython();
-        extractPython();
-        configurePython();
-        await installPip();
-        installDependencies();
+        // Check if we need to extract (if we detected it wasn't already there)
+        // For simplicity if we downloaded, we extract.
+        if (fs.existsSync(FILE_PATH)) {
+            await extractPython();
+        }
 
-        console.log('✅ Python runtime setup complete!');
-        console.log(`📍 Location: ${RUNTIME_DIR}`);
-        console.log('\nYou can now build your application with: npm run build\n');
+        configurePython();
+        await postInstall();
+
+        console.log('✅ Python setup complete!');
     } catch (error) {
         console.error('❌ Setup failed:', error.message);
         process.exit(1);

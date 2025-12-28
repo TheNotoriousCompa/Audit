@@ -60,17 +60,17 @@ def parse_arguments(args: Optional[List[str]] = None) -> Dict[str, Any]:
     )
     
     parser.add_argument(
-        "--bitrate",
-        type=int,
-        default=config.DEFAULT_BITRATE,
-        help=f"Audio bitrate in kbps (default: {config.DEFAULT_BITRATE})"
+        "--quality",
+        type=str,
+        default=str(config.DEFAULT_BITRATE),
+        help="Quality setting (bitrate for audio, resolution for video)"
     )
-    
+
     parser.add_argument(
         "--format",
         type=str,
         default='mp3',
-        choices=['mp3', 'm4a', 'flac', 'wav', 'opus', 'best'],
+        choices=['mp3', 'm4a', 'flac', 'wav', 'opus', 'best', 'mp4'],
         help="Output format (default: mp3)"
     )
     
@@ -101,6 +101,13 @@ def parse_arguments(args: Optional[List[str]] = None) -> Dict[str, Any]:
     )
     
     parser.add_argument(
+        "--fps",
+        type=int,
+        default=None,
+        help="Minimum FPS (e.g. 30, 60)"
+    )
+
+    parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
@@ -111,7 +118,7 @@ def parse_arguments(args: Optional[List[str]] = None) -> Dict[str, Any]:
         "--log-file",
         help="Path to log file (default: None, logs to console only)"
     )
-    
+
     # Parse arguments
     parsed_args = parser.parse_args(args)
     
@@ -119,8 +126,10 @@ def parse_arguments(args: Optional[List[str]] = None) -> Dict[str, Any]:
     args_dict = {
         'url': parsed_args.url,
         'output_folder': Path(parsed_args.output_folder).resolve(),
-        'bitrate': parsed_args.bitrate,
+        'bitrate': int(parsed_args.quality) if parsed_args.format in ['mp3', 'm4a', 'flac', 'wav', 'opus'] and parsed_args.quality.isdigit() else config.DEFAULT_BITRATE,
+        'quality': parsed_args.quality,
         'format': parsed_args.format,
+        'fps': parsed_args.fps,
         'batch_file': Path(parsed_args.batch) if parsed_args.batch else None,
         'process_playlist': parsed_args.process_playlist,
         'timeout': parsed_args.timeout,
@@ -145,10 +154,20 @@ def parse_json_input(json_input: str) -> Dict[str, Any]:
         data = json.loads(json_input)
         
         # Convert to the same format as CLI args
+        quality = data.get('quality', str(config.DEFAULT_BITRATE))
+        fmt = data.get('format', 'mp3')
+        
+        bitrate = config.DEFAULT_BITRATE
+        if fmt in ['mp3', 'm4a', 'flac', 'wav', 'opus'] and str(quality).isdigit():
+            bitrate = int(quality)
+
         return {
             'url': data.get('url'),
             'output_folder': Path(data.get('output_folder', str(config.DEFAULT_OUTPUT_DIR))).resolve(),
-            'bitrate': int(data.get('bitrate', config.DEFAULT_BITRATE)),
+            'bitrate': bitrate,
+            'quality': quality,
+            'format': fmt,
+            'fps': int(data.get('fps')) if data.get('fps') else None,
             'process_playlist': bool(data.get('process_playlist', False)),
             'timeout': int(data.get('timeout', config.DEFAULT_TIMEOUT)),
             'max_retries': int(data.get('max_retries', config.DEFAULT_MAX_RETRIES)),

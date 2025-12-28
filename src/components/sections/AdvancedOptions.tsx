@@ -5,16 +5,20 @@ interface AdvancedOptionsProps {
   show: boolean;
   format: string;
   setFormat: (format: string) => void;
-  bitrate: number;
-  setBitrate: (bitrate: number) => void;
+  quality: string;
+  setQuality: (quality: string) => void;
+  fps: number | null;
+  setFps: (fps: number | null) => void;
 }
 
 const AdvancedOptions: React.FC<AdvancedOptionsProps> = ({
   show,
   format,
   setFormat,
-  bitrate,
-  setBitrate,
+  quality,
+  setQuality,
+  fps,
+  setFps,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -50,7 +54,7 @@ const AdvancedOptions: React.FC<AdvancedOptionsProps> = ({
         >
           <div className="p-6 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 shadow-lg">
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 {/* Format Selection */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-300">
@@ -73,22 +77,56 @@ const AdvancedOptions: React.FC<AdvancedOptionsProps> = ({
                   </div>
                 </div>
 
-                {/* Bitrate Selection - Only for Audio */}
-                {(format === 'mp3' || format === 'm4a' || format === 'opus') && (
+                {/* Quality Selection */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-300">
+                    {format === 'mp4' ? 'Resolution' : 'Bitrate (Quality)'}
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={quality}
+                      onChange={(e) => setQuality(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-gray-200 text-sm focus:ring-1 focus:ring-white/30 focus:border-white/30 outline-none transition-all duration-200 appearance-none hover:bg-white/10 [&_option]:bg-gray-800 [&_option]:text-gray-200"
+                    >
+                      {format === 'mp4' ? (
+                        <>
+                          <option value="1080p">1080p</option>
+                          <option value="720p">720p</option>
+                          <option value="480p">480p</option>
+                          <option value="360p">360p</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="320">320 kbps (High Quality)</option>
+                          <option value="256">256 kbps</option>
+                          <option value="192">192 kbps</option>
+                          <option value="128">128 kbps</option>
+                        </>
+                      )}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* FPS Selection - Only for Video */}
+                {format === 'mp4' && (
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-300">
-                      Bitrate (Quality)
+                      Framerate
                     </label>
                     <div className="relative">
                       <select
-                        value={bitrate}
-                        onChange={(e) => setBitrate(Number(e.target.value))}
+                        value={fps || ''}
+                        onChange={(e) => setFps(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-gray-200 text-sm focus:ring-1 focus:ring-white/30 focus:border-white/30 outline-none transition-all duration-200 appearance-none hover:bg-white/10 [&_option]:bg-gray-800 [&_option]:text-gray-200"
                       >
-                        <option value="320">320 kbps (High Quality)</option>
-                        <option value="256">256 kbps</option>
-                        <option value="192">192 kbps</option>
-                        <option value="128">128 kbps</option>
+                        <option value="">Auto (Default)</option>
+                        <option value="60">60 FPS (Smooth)</option>
+                        <option value="30">30 FPS</option>
                       </select>
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                         <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

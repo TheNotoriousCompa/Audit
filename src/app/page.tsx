@@ -17,8 +17,9 @@ export default function Home() {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [bitrate, setBitrate] = useState(320);
+    const [quality, setQuality] = useState("320");
     const [format, setFormat] = useState('mp3');
+    const [fps, setFps] = useState<number | null>(null);
     const [showAdvanced, setShowAdvanced] = useState(false);
     // Advanced options removed from UI but keeping defaults
     const [skipExisting] = useState(true);
@@ -317,7 +318,12 @@ export default function Home() {
         try {
             const formData = new FormData();
             formData.append("file", file);
-            formData.append("bitrate", bitrate.toString());
+            formData.append("quality", quality);
+            // Backward compatibility for bitrate if needed by API
+            if (!isNaN(Number(quality))) {
+                formData.append("bitrate", quality);
+            }
+            if (fps) formData.append("fps", fps.toString());
             formData.append("timeout", timeout.toString());
             formData.append("skipExisting", skipExisting ? "1" : "0");
             if (outputFolder) formData.append("outputFolder", outputFolder);
@@ -407,14 +413,16 @@ export default function Home() {
             // Prepare options object with proper typing
             const options: {
                 outputDir?: string;
-                bitrate: number;
+                quality: string;
+                fps?: number;
                 timeout: number;
                 skipExisting: boolean;
                 processPlaylist: boolean;
                 format: 'mp3' | 'm4a' | 'flac' | 'wav' | 'opus' | 'best';
             } = {
                 outputDir: outputFolder || undefined,
-                bitrate,
+                quality,
+                fps: fps || undefined,
                 timeout,
                 skipExisting,
                 processPlaylist,
@@ -638,9 +646,21 @@ export default function Home() {
                         <AdvancedOptions
                             show={showAdvanced}
                             format={format}
-                            setFormat={setFormat}
-                            bitrate={bitrate}
-                            setBitrate={setBitrate}
+                            setFormat={(f) => {
+                                setFormat(f);
+                                // Default quality settings when switching formats
+                                if (f === 'mp4') {
+                                    setQuality('1080p');
+                                    setFps(null); // Reset FPS to Auto
+                                } else {
+                                    setQuality('320');
+                                    setFps(null);
+                                }
+                            }}
+                            quality={quality}
+                            setQuality={setQuality}
+                            fps={fps}
+                            setFps={setFps}
                         />
 
                         <Personalize
