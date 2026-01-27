@@ -86,24 +86,4 @@ The application includes:
 
 These are automatically downloaded and configured during the build process via `prebuild` hooks.
 
-## Auto-Updates
-
-The application uses Squirrel.Windows for automatic updates. When a new version is released on GitHub, users will be notified and the update will be downloaded in the background. The update is applied on the next application restart.
-
-### Publishing Updates
-
-1. Update the `version` field in `package.json`
-2. Run `npm run make`
-3. Create a new release on GitHub with the version tag (e.g., `v0.2.0`)
-4. Upload these files from `out/make/squirrel.windows/x64/`:
-   - `Audit-Setup.exe`
-   - `RELEASES`
-   - `Audit-{version}-full.nupkg`
-
-## License
-
-MIT License
-
-## Contributing
-
 Contributions are welcome! Please feel free to submit a Pull Request.
