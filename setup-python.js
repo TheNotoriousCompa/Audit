@@ -72,27 +72,17 @@ async function downloadPython() {
     console.log(`📥 Downloading Python...`);
     console.log(`   URL: ${DOWNLOAD_URL}`);
 
-    // Use curl for robust download handling (redirects, etc.)
+    // Use curl for robust download handling
+    // -L: Follow redirects
+    // -f: Fail on HTTP errors (404, etc)
+    // --retry 3: Retry on transient errors
     try {
-        execSync(`curl -L -o "${FILE_PATH}" "${DOWNLOAD_URL}"`, { stdio: 'inherit' });
+        console.log('   Running curl...');
+        execSync(`curl -L -f --retry 3 -o "${FILE_PATH}" "${DOWNLOAD_URL}"`, { stdio: 'inherit' });
         console.log('\n✓ Download complete!\n');
     } catch (e) {
-        console.error('Curl failed, falling back to https...');
-        // Fallback for systems without curl (rare in CI)
-        const file = fs.createWriteStream(FILE_PATH);
-        return new Promise((resolve, reject) => {
-            https.get(DOWNLOAD_URL, response => {
-                if (response.statusCode === 302 || response.statusCode === 301) {
-                    https.get(response.headers.location, redirectResponse => {
-                        redirectResponse.pipe(file);
-                        file.on('finish', () => { file.close(); resolve(); });
-                    }).on('error', reject);
-                } else {
-                    response.pipe(file);
-                    file.on('finish', () => { file.close(); resolve(); });
-                }
-            }).on('error', reject);
-        });
+        console.error('❌ Download failed:', e.message);
+        throw e;
     }
 }
 
@@ -156,6 +146,15 @@ async function postInstall() {
     let pythonBin = IS_WINDOWS
         ? path.join(RUNTIME_DIR, 'python.exe')
         : path.join(RUNTIME_DIR, 'bin', 'python3');
+
+    // Check for nested 'python' directory (common in standalone builds)
+    if (!IS_WINDOWS && !fs.existsSync(pythonBin)) {
+        const nestedBin = path.join(RUNTIME_DIR, 'python', 'bin', 'python3');
+        if (fs.existsSync(nestedBin)) {
+            pythonBin = nestedBin;
+            console.log(`✓ Found python3 in nested directory: ${pythonBin}`);
+        }
+    }
 
     // Dynamic search for Unix binary if standard path fails
     if (!IS_WINDOWS && !fs.existsSync(pythonBin)) {
