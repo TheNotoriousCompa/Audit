@@ -72,29 +72,28 @@ async function downloadPython() {
     console.log(`📥 Downloading Python...`);
     console.log(`   URL: ${DOWNLOAD_URL}`);
 
-    const file = fs.createWriteStream(FILE_PATH);
-
-    return new Promise((resolve, reject) => {
-        https.get(DOWNLOAD_URL, response => {
-            if (response.statusCode === 302 || response.statusCode === 301) {
-                https.get(response.headers.location, redirectResponse => {
-                    redirectResponse.pipe(file);
-                    file.on('finish', () => {
-                        file.close();
-                        console.log('\n✓ Download complete!\n');
-                        resolve();
-                    });
-                }).on('error', reject);
-            } else {
-                response.pipe(file);
-                file.on('finish', () => {
-                    file.close();
-                    console.log('\n✓ Download complete!\n');
-                    resolve();
-                });
-            }
-        }).on('error', reject);
-    });
+    // Use curl for robust download handling (redirects, etc.)
+    try {
+        execSync(`curl -L -o "${FILE_PATH}" "${DOWNLOAD_URL}"`, { stdio: 'inherit' });
+        console.log('\n✓ Download complete!\n');
+    } catch (e) {
+        console.error('Curl failed, falling back to https...');
+        // Fallback for systems without curl (rare in CI)
+        const file = fs.createWriteStream(FILE_PATH);
+        return new Promise((resolve, reject) => {
+            https.get(DOWNLOAD_URL, response => {
+                if (response.statusCode === 302 || response.statusCode === 301) {
+                    https.get(response.headers.location, redirectResponse => {
+                        redirectResponse.pipe(file);
+                        file.on('finish', () => { file.close(); resolve(); });
+                    }).on('error', reject);
+                } else {
+                    response.pipe(file);
+                    file.on('finish', () => { file.close(); resolve(); });
+                }
+            }).on('error', reject);
+        });
+    }
 }
 
 // Step 3: Extract
