@@ -99,6 +99,12 @@ async function downloadPython() {
 
 // Step 3: Extract
 async function extractPython() {
+    const stats = fs.statSync(FILE_PATH);
+    console.log(`📦 Archive size: ${stats.size} bytes`);
+    if (stats.size < 1000) {
+        throw new Error('Downloaded file is too small, likely an error page.');
+    }
+
     console.log('📦 Extracting Python...');
 
     if (IS_WINDOWS) {
@@ -106,17 +112,14 @@ async function extractPython() {
         zip.extractAllTo(RUNTIME_DIR, true);
         fs.unlinkSync(FILE_PATH);
     } else {
-        // tar.gz extraction
-        // Actions/Mac usually have tar
-        // cpython builds extract to a 'python' folder usually, or install structure
-        // We want to extract STRIP components so it goes directly into RUNTIME_DIR
         try {
-            // Extract fully without assuming structure
-            execSync(`tar -xzf "${FILE_PATH}" -C "${RUNTIME_DIR}"`);
+            // Extract fully with verbose output to see what's happening
+            console.log('   Running tar -xvf...');
+            execSync(`tar -xvf "${FILE_PATH}" -C "${RUNTIME_DIR}"`, { stdio: 'inherit' });
             fs.unlinkSync(FILE_PATH);
 
-            // Debug: List full structure
-            console.log('📂 Extraction Results:');
+            // Debug: List full structure again to be sure
+            console.log('📂 Extraction Results (ls -R):');
             try { execSync(`ls -R "${RUNTIME_DIR}"`, { stdio: 'inherit' }); } catch (e) { }
 
         } catch (e) {
@@ -150,14 +153,6 @@ function configurePython() {
 // Step 5: Install pip/Utils
 async function postInstall() {
     console.log('⚙️  Running post-install setup...');
-
-    // Debug: List extracted files
-    if (!IS_WINDOWS) {
-        console.log('📂 Extracted content:');
-        try {
-            execSync(`ls -R "${RUNTIME_DIR}"`, { stdio: 'inherit' });
-        } catch (e) { console.log('Could not list files'); }
-    }
 
     let pythonBin = IS_WINDOWS
         ? path.join(RUNTIME_DIR, 'python.exe')
@@ -213,7 +208,6 @@ async function postInstall() {
         const pipArgs = IS_WINDOWS
             ? ['install', '-r', reqPath, '--target', path.join(RUNTIME_DIR, 'Lib', 'site-packages')]
             : ['install', '-r', reqPath]; // Standalone python handles site-packages automatically if we use its pip
-        // However, for standalone build we might need to invoke its pip module
 
         if (IS_WINDOWS) {
             const pipExe = path.join(RUNTIME_DIR, 'Scripts', 'pip.exe');
