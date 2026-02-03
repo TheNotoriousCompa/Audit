@@ -61,47 +61,30 @@ function downloadFFmpeg() {
         console.log(`   URL: ${DOWNLOAD_URL}`);
 
         const destPath = IS_ZIP ? ZIP_PATH : TAR_PATH;
-        const file = fs.createWriteStream(destPath);
 
-        https.get(DOWNLOAD_URL, (response) => {
-            // Handle redirects
-            if (response.statusCode === 302 || response.statusCode === 301) {
-                https.get(response.headers.location, (redirectResponse) => {
-                    handleResponse(redirectResponse, file, destPath, resolve, reject);
-                }).on('error', reject);
+        // Use curl for robust download handling
+        try {
+            console.log('   Running curl...');
+            execSync(`curl -L -f --retry 3 -o "${destPath}" "${DOWNLOAD_URL}"`, { stdio: 'inherit' });
+
+            // Verify download
+            if (fs.existsSync(destPath)) {
+                const stats = fs.statSync(destPath);
+                console.log(`📦 Archive size: ${stats.size} bytes`);
+                if (stats.size < 1000) {
+                    throw new Error('Downloaded file is too small, likely an error page.');
+                }
             } else {
-                handleResponse(response, file, destPath, resolve, reject);
+                throw new Error('Download failed, file not found.');
             }
-        }).on('error', (err) => {
+
+            console.log('\n✓ Download complete!\n');
+            resolve();
+        } catch (e) {
+            console.error('❌ Download failed:', e.message);
             if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
-            reject(err);
-        });
-    });
-}
-
-function handleResponse(response, file, destPath, resolve, reject) {
-    const totalSize = parseInt(response.headers['content-length'], 10);
-    let downloaded = 0;
-
-    response.on('data', (chunk) => {
-        downloaded += chunk.length;
-        if (totalSize) {
-            const percent = ((downloaded / totalSize) * 100).toFixed(1);
-            process.stdout.write(`\r   Progress: ${percent}%`);
+            reject(e);
         }
-    });
-
-    response.pipe(file);
-
-    file.on('finish', () => {
-        file.close();
-        console.log('\n✓ Download complete!\n');
-        resolve();
-    });
-
-    file.on('error', (err) => {
-        fs.unlinkSync(destPath);
-        reject(err);
     });
 }
 
