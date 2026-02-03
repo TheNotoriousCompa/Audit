@@ -146,13 +146,41 @@ function configurePython() {
 async function postInstall() {
     console.log('⚙️  Running post-install setup...');
 
-    const pythonBin = IS_WINDOWS
+    // Debug: List extracted files
+    if (!IS_WINDOWS) {
+        console.log('📂 Extracted content:');
+        try {
+            execSync(`ls -R "${RUNTIME_DIR}"`, { stdio: 'inherit' });
+        } catch (e) { console.log('Could not list files'); }
+    }
+
+    let pythonBin = IS_WINDOWS
         ? path.join(RUNTIME_DIR, 'python.exe')
         : path.join(RUNTIME_DIR, 'bin', 'python3');
 
+    // Dynamic search for Unix binary if standard path fails
+    if (!IS_WINDOWS && !fs.existsSync(pythonBin)) {
+        console.log('⚠️  Standard python3 path not found, searching...');
+        const findCmd = `find "${RUNTIME_DIR}" -name "python3" -type f`;
+        try {
+            const found = execSync(findCmd, { encoding: 'utf-8' }).trim().split('\n')[0];
+            if (found) {
+                console.log(`✓ Found python3 at: ${found}`);
+                pythonBin = found;
+            }
+        } catch (e) {
+            console.log('Could not find python3 binary');
+        }
+    }
+
     // Ensure executable on Unix
     if (!IS_WINDOWS) {
-        execSync(`chmod +x "${pythonBin}"`);
+        if (fs.existsSync(pythonBin)) {
+            execSync(`chmod +x "${pythonBin}"`);
+        } else {
+            console.error(`❌ Python binary not found at ${pythonBin}`);
+            // Don't exit yet, let it fail at next step or print more info
+        }
     }
 
     // Install Pip for Windows (Unix builds usually have it or ensurepip)
