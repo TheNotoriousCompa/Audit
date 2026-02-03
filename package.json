@@ -26,7 +26,6 @@
     "setup:python": "node setup-python.js",
     "setup:ffmpeg": "node setup-ffmpeg.js",
     "prebuild": "npm run setup:python && npm run setup:ffmpeg",
-    "postinstall": "electron-builder install-app-deps",
     "package": "npm run build && electron-forge package",
     "make": "electron-forge make",
     "publish": "npm run build && electron-forge publish",
