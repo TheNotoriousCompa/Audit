@@ -111,10 +111,14 @@ async function extractPython() {
         // cpython builds extract to a 'python' folder usually, or install structure
         // We want to extract STRIP components so it goes directly into RUNTIME_DIR
         try {
-            // The standalone builds usually extract to a 'python' folder.
-            // We'll extract to module dir first then move? Or just --strip-components
-            execSync(`tar -xzf "${FILE_PATH}" -C "${RUNTIME_DIR}" --strip-components=1`);
+            // Extract fully without assuming structure
+            execSync(`tar -xzf "${FILE_PATH}" -C "${RUNTIME_DIR}"`);
             fs.unlinkSync(FILE_PATH);
+
+            // Debug: List full structure
+            console.log('📂 Extraction Results:');
+            try { execSync(`ls -R "${RUNTIME_DIR}"`, { stdio: 'inherit' }); } catch (e) { }
+
         } catch (e) {
             console.error(e);
             throw new Error('Failed to extract tar.gz');
@@ -126,9 +130,10 @@ async function extractPython() {
 // Step 4: Configure (Windows only mainly)
 function configurePython() {
     if (!IS_WINDOWS) {
-        // Unix standalone builds are usually self-contained and ready
         return;
     }
+    // ... Windows config ...
+
     console.log('⚙️  Configuring Python paths (Windows)...');
     // ... existing windows pth logic ...
     const pthFile = path.join(RUNTIME_DIR, `python${WIN_PYTHON_VERSION.replace('.', '').substring(0, 3)}._pth`);
