@@ -26,7 +26,7 @@ if (platform === 'win32') {
 } else if (platform === 'darwin') {
     // macOS (Intel & Apple Silicon) - Static builds
     IS_ZIP = true;
-    DOWNLOAD_URL = 'https://evermeet.cx/ffmpeg/ffmpeg-115340-g4909a96324.zip'; // Using a stable static build
+    DOWNLOAD_URL = 'https://evermeet.cx/ffmpeg/get/zip'; // Always gets latest release/snapshot as zip
 } else if (platform === 'linux') {
     IS_ZIP = false;
     DOWNLOAD_URL = 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz';

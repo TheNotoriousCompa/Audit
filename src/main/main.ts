@@ -426,6 +426,13 @@ async function runDownloadScript(url: string, options: DownloadOptions): Promise
           success: false,
           error: `Python script exited with code ${code}`
         });
+      } else {
+        // If process exited with code 0 but no result JSON was parsed,
+        // resolve anyway to avoid "reply was never sent" errors
+        resolve({
+          success: false,
+          error: 'Download process completed without returning a result'
+        });
       }
     });
   });

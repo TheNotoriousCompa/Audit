@@ -189,6 +189,32 @@ def _process_metadata(file_path: Path, info: dict, progress_callback: Optional[C
         # Continue execution even if metadata processing fails
         pass
 
+import sys
+
+def update_ytdlp():
+    """Updates yt-dlp to the latest version using pip (fast/silent when already up-to-date)."""
+    try:
+        logger.info("Checking for yt-dlp updates...")
+        python_executable = sys.executable
+        result = subprocess.run(
+            [python_executable, "-m", "pip", "install", "--upgrade", "--quiet", "yt-dlp"],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0:
+            if "Successfully installed" in result.stdout:
+                logger.info("yt-dlp updated successfully.")
+            else:
+                logger.info("yt-dlp is already up-to-date.")
+        else:
+            logger.warning(f"yt-dlp update check returned code {result.returncode}")
+        return result.returncode == 0
+    except subprocess.TimeoutExpired:
+        logger.warning("yt-dlp update check timed out (30s), continuing with current version.")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to update yt-dlp: {e}")
+        return False
+
 def download_media(
     url: str,
     output_dir: str,
@@ -206,6 +232,11 @@ def download_media(
     """
     # Reset global progress state for each new download session
     reset_progress_state()
+
+    # Auto-update yt-dlp to avoid 403/format errors from outdated versions
+    if progress_callback:
+        progress_callback({"status": "info", "message": "Checking for yt-dlp updates..."})
+    update_ytdlp()
 
     ensure_directory(output_dir)
 
@@ -309,8 +340,8 @@ def download_media(
         })
 
     else:
-        # Audio logic (existing)
-        ydl_opts["format"] = f"bestaudio[ext={format}]/bestaudio"
+        # Audio logic - Simplified to find best audio available, since we convert anyway
+        ydl_opts["format"] = "bestaudio/best"
         ydl_opts["outtmpl"] = str(Path(output_dir) / f"%(title)s.{format}")  # Force the output extension
     
     if ffmpeg_path:
@@ -337,57 +368,77 @@ def download_media(
     playlist_folder = None
 
     info = None
-
-    try:
-        # Prima estrazione VELOCE per ottenere solo il nome della playlist (senza metadati dettagliati)
-        # Usa extract_flat per velocizzare enormemente questa fase
-        if process_playlist:
-            if progress_callback:
-                progress_callback({"status": "info", "message": "Extracting playlist info..."})
-            
-            flat_opts = ydl_opts.copy()
-            flat_opts['extract_flat'] = 'in_playlist'  # Non scarica metadati dettagliati
-            with yt_dlp.YoutubeDL(flat_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-            
-        # Se è una playlist e process_playlist è True, crea una cartella con il nome della playlist
-        if info and process_playlist and "entries" in info and info["entries"]:
-            playlist_title = info.get('title', info.get('playlist_title', 'Playlist'))
-            playlist_folder = Path(output_dir) / sanitize_filename(playlist_title)
-            ensure_directory(str(playlist_folder))
-            
-            # Update playlist state for progress tracking
-            playlist_state['total_count'] = len([e for e in info['entries'] if e])
-            playlist_state['playlist_name'] = playlist_title
-            playlist_state['current_index'] = 1  # Start from 1 (1-based indexing)
-
-            # Inizializza anche il calcolatore di progressi globale
-            set_playlist_info(playlist_state['total_count'], playlist_title)
-            
-            # Aggiorna l'output template per salvare nella cartella della playlist
-            ydl_opts["outtmpl"] = str(playlist_folder / "%(title)s.%(ext)s")
-            
-            if progress_callback:
-                progress_callback({
-                    "status": "info",
-                    "message": f"Playlist rilevata: {playlist_title}",
-                    "playlist_name": playlist_title,
-                    "playlist_folder": str(playlist_folder),
-                    "playlist_count": playlist_state['total_count']
-                })
-        
-        
-        # Ora scarica con le opzioni aggiornate (nuovo contesto)
-        if progress_callback:
-            progress_callback({"status": "info", "message": "Starting download process..."})
-            
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            try:
-                info = ydl.extract_info(url, download=True)
-            except Exception as e:
+    
+    # Retry mechanism for download/update loop
+    attempt = 0
+    updated_once = False
+    
+    while attempt <= 1: # Try once originally, and maybe once more after update
+        attempt += 1
+        try:
+            # Prima estrazione VELOCE per ottenere solo il nome della playlist (senza metadati dettagliati)
+            # Usa extract_flat per velocizzare enormemente questa fase
+            if process_playlist:
                 if progress_callback:
-                    progress_callback({"status": "error", "message": f"Download failed: {str(e)}"})
-                raise e
+                    progress_callback({"status": "info", "message": "Extracting playlist info..."})
+                
+                flat_opts = ydl_opts.copy()
+                flat_opts['extract_flat'] = 'in_playlist'  # Non scarica metadati dettagliati
+                with yt_dlp.YoutubeDL(flat_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                
+            # Se è una playlist e process_playlist è True, crea una cartella con il nome della playlist
+            if info and process_playlist and "entries" in info and info["entries"]:
+                playlist_title = info.get('title', info.get('playlist_title', 'Playlist'))
+                playlist_folder = Path(output_dir) / sanitize_filename(playlist_title)
+                ensure_directory(str(playlist_folder))
+                
+                # Update playlist state for progress tracking
+                playlist_state['total_count'] = len([e for e in info['entries'] if e])
+                playlist_state['playlist_name'] = playlist_title
+                playlist_state['current_index'] = 1  # Start from 1 (1-based indexing)
+
+                # Inizializza anche il calcolatore di progressi globale
+                set_playlist_info(playlist_state['total_count'], playlist_title)
+                
+                # Aggiorna l'output template per salvare nella cartella della playlist
+                ydl_opts["outtmpl"] = str(playlist_folder / "%(title)s.%(ext)s")
+                
+                if progress_callback:
+                    progress_callback({
+                        "status": "info",
+                        "message": f"Playlist rilevata: {playlist_title}",
+                        "playlist_name": playlist_title,
+                        "playlist_folder": str(playlist_folder),
+                        "playlist_count": playlist_state['total_count']
+                    })
+            
+            
+            # Ora scarica con le opzioni aggiornate (nuovo contesto)
+            if progress_callback:
+                progress_callback({"status": "info", "message": "Starting download process..."})
+                
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception as e:
+                    # Check for 403 or specific download errors to trigger update
+                    error_str = str(e)
+                    if "403" in error_str or "Forbidden" in error_str or "Sign in" in error_str or "Requested format" in error_str:
+                        # Only try to update and retry ONCE
+                        if not updated_once:
+                            if progress_callback:
+                                progress_callback({"status": "info", "message": "Download error detected. Attempting to update yt-dlp..."})
+                            
+                            if update_ytdlp():
+                                updated_once = True
+                                if progress_callback:
+                                    progress_callback({"status": "info", "message": "yt-dlp updated. Retrying download..."})
+                                continue # Continue to next iteration of while loop (retry)
+                    
+                    if progress_callback:
+                        progress_callback({"status": "error", "message": f"Download failed: {str(e)}"})
+                    raise e # Re-raise if no update or update failed or already updated
 
             
             if info is None:
@@ -458,7 +509,7 @@ def download_media(
                 if playlist_folder and playlist_folder.exists():
                     folders_to_check.append(playlist_folder)
                 if output_dir and Path(output_dir).exists():
-                     folders_to_check.append(Path(output_dir))
+                        folders_to_check.append(Path(output_dir))
 
                 playlist_name_sanitized = sanitize_filename(info.get('title', ''))
 
@@ -483,11 +534,16 @@ def download_media(
                 if 'requested_downloads' in info and info['requested_downloads']:
                     # Get the first (and usually only) download
                     download_info = info['requested_downloads'][0]
-                    downloaded_file = Path(download_info['filepath']).resolve()
+                    filepath = download_info.get('filepath')
+                    
+                    if not filepath:
+                         return False, None, "Percorso file non disponibile nei metadati scaricati"
+                         
+                    downloaded_file = Path(filepath).resolve()
                     
                     # Post-processing per il file singolo
                     if format.lower() == 'mp3' and (downloaded_file.suffix.lower() == '.mp3' or 
-                                                 (hasattr(download_info, 'ext') and download_info.ext.lower() == 'mp3')):
+                                                    (hasattr(download_info, 'ext') and download_info.ext.lower() == 'mp3')):
                         _process_metadata(downloaded_file, info, progress_callback)
                     
                     # Determina il nome finale del file
@@ -533,15 +589,24 @@ def download_media(
                     if filepath and Path(filepath).exists():
                         return True, str(Path(filepath).resolve()), "Download completato con successo"
                 return False, None, "Impossibile determinare il percorso del file scaricato"
+                
+            # If we reached here successfully, break the retry loop
+            break
 
-    except yt_dlp.utils.DownloadError as e:
-        error_msg = str(e)
-        logger.error(f"Download error: {error_msg}")
-        return False, None, f"Errore durante il download: {error_msg}"
-    except Exception as e:
-        error_msg = str(e)
-        logger.exception(f"Unexpected error: {error_msg}")
-        return False, None, f"Errore imprevisto: {error_msg}"
+        except yt_dlp.utils.DownloadError as e:
+            # Caught inside logic loop, but re-caught here if re-raised
+            error_msg = str(e)
+            logger.error(f"Download error: {error_msg}")
+            
+            # Use improved error message for 403
+            if "403" in error_msg and "Forbidden" in error_msg:
+                 return False, None, "Errore 403: Accesso negato da YouTube. Riprova più tardi o aggiorna l'app."
+            
+            return False, None, f"Errore durante il download: {error_msg}"
+        except Exception as e:
+            error_msg = str(e)
+            logger.exception(f"Unexpected error: {error_msg}")
+            return False, None, f"Errore imprevisto: {error_msg}"
 
 def _on_progress(d: dict[str, Any], callback: Optional[Callable] = None) -> None:
     """Progress callback for yt-dlp.
