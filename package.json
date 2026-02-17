@@ -1,6 +1,6 @@
 {
   "name": "ytmp3-next",
-  "version": "1.2.10",
+  "version": "1.2.11",
   "private": true,
   "productName": "Audit",
   "main": "./dist/main/main.js",
