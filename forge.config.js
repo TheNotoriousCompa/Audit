@@ -1,12 +1,8 @@
 // forge.config.js
-import { FusesPlugin } from '@electron-forge/plugin-fuses';
-import { FuseV1Options, FuseVersion } from '@electron/fuses';
-import fs from 'fs-extra';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { FusesPlugin } = require('@electron-forge/plugin-fuses');
+const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const fs = require('fs-extra');
+const path = require('path');
 
 const config = {
   packagerConfig: {
@@ -15,16 +11,52 @@ const config = {
     asar: {
       unpack: "**/{python,ffmpeg,*.py,*.pyc,*.exe}/**/*"
     },
-    icon: './src/app/favicon.ico',
-    // These files will be packed into app.asar
-    files: [
-      'dist/main/**/*',
-      'dist/preload/**/*',
-      'dist/renderer/**/*',
-      'python/**/*',
-      'ffmpeg/**/*',
-      'package.json',
-    ],
+    icon: path.join(__dirname, 'src', 'app', 'favicon.ico'),
+    ignore: (filePath) => {
+      const p = filePath.replace(/\\/g, '/');
+
+      if (p.includes('/node_modules/')) {
+        const allowedDeps = new Set([
+          'electron-is-dev',
+          'electron-serve',
+          'electron-squirrel-startup',
+          'update-electron-app',
+          'github-url-to-object',
+          'ms',
+          'debug',
+          'is-url'
+        ]);
+
+        const match = p.match(/\/node_modules\/((?:@[^/]+\/[^/]+)|(?:[^/]+))/);
+        if (match && !allowedDeps.has(match[1])) return true;
+        return false;
+      }
+
+      const ignored = [
+        /\/\.git(?:\/|$)/,
+        /\/\.github(?:\/|$)/,
+        /\/\.next(?:\/|$)/,
+        /\/out(?:\/|$)/,
+        /\/src(?:\/|$)/,
+        /\/scratch(?:\/|$)/,
+        /\/tmp(?:\/|$)/,
+        /\/python-runtime(?:\/|$)/,
+        /\/python(?:\/|$)/,
+        /\/ffmpeg(?:\/|$)/,
+        /\/tsconfig\./,
+        /\/eslint\./,
+        /\/postcss\.config\./,
+        /\/components\.json$/,
+        /\/requirements\.txt$/,
+        /\/CONTEXT\.md$/,
+        /\/README\.md$/,
+        /\/setup-python\.js$/,
+        /\/setup-ffmpeg\.js$/,
+        /\.log$/,
+      ];
+
+      return ignored.some(r => r.test(p));
+    },
     // Hook to copy python-runtime to resources
     afterCopy: [(buildPath, electronVersion, platform, arch, callback) => {
       const source = path.join(__dirname, 'python-runtime');
@@ -42,32 +74,14 @@ const config = {
         }
       });
     }],
-    // These files will be available in app.asar.unpacked
-    extraResources: [
-      {
-        from: "./python",
-        to: "python",
-        filter: ["**/*"],
-      },
+    // Copy python and ffmpeg to extraResource directory directly outside app.asar
+    extraResource: [
+      "./python",
+      "./ffmpeg",
     ],
   },
   rebuildConfig: {},
   makers: [
-    {
-      name: '@electron-forge/maker-squirrel',
-      platforms: ['win32'],
-      config: (/* arch */) => ({
-        name: 'Audit',
-        authors: 'Maurizio Compagnone',
-        description: 'YouTube MP3 Converter',
-        setupIcon: './src/app/favicon.ico',
-        noMsi: false,
-        setupExe: 'Audit-Setup.exe',
-        createDesktopShortcut: true,
-        createStartMenuShortcut: true,
-        shortcutName: 'Audit',
-      }),
-    },
     {
       name: '@electron-forge/maker-zip',
       platforms: ['win32', 'darwin'],
@@ -103,4 +117,4 @@ const config = {
   ]
 };
 
-export default config;
+module.exports = config;

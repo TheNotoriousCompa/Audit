@@ -10,72 +10,19 @@ Dependencies:
 - mutagen (for metadata)
 - requests (for artwork download)
 """
-import os
 import logging
-import subprocess
 from pathlib import Path
 from typing import Optional, Callable, Tuple, Any
 
 import yt_dlp
 
-# Importa le funzioni necessarie dal modulo postprocess
+# Importa le funzioni necessarie dai moduli locali
 from .postprocess import set_mp3_metadata, download_artwork
-from .utils import ensure_directory, sanitize_filename
+from .utils import ensure_directory, sanitize_filename, update_ytdlp
+from .search import check_ffmpeg
 from .progress import reset_progress_state, set_playlist_info, calculate_progress
 
 logger = logging.getLogger(__name__)
-
-def check_ffmpeg():
-    """Check for FFmpeg in common locations and return the path if found."""
-    possible_paths = [
-        # Check in app.asar.unpacked (where asar.unpack puts it)
-        Path(__file__).parent.parent.parent / "ffmpeg" / "bin" / "ffmpeg.exe",
-        # Check in bundled ffmpeg (for packaged app)
-        Path(__file__).parent.parent / "ffmpeg" / "bin" / "ffmpeg.exe",
-        # Check in the same directory as the script
-        Path(__file__).parent / "ffmpeg.exe",
-        # Check in a subdirectory
-        Path(__file__).parent / "ffmpeg" / "bin" / "ffmpeg.exe",
-        # Check in the current working directory
-        Path("ffmpeg.exe"),
-        # Check in the system PATH
-        Path("ffmpeg"),
-        # Common Windows installation paths
-        Path("C:\\ffmpeg\\bin\\ffmpeg.exe"),
-        Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "ffmpeg" / "bin" / "ffmpeg.exe",
-        Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "ffmpeg" / "bin" / "ffmpeg.exe",
-    ]
-
-    # Add paths from system PATH
-    path_env = os.environ.get("PATH", "")
-    path_dirs = [Path(p.strip()) for p in path_env.split(os.pathsep) if p.strip()]
-    
-    for path_dir in path_dirs:
-        possible_paths.extend([
-            path_dir / "ffmpeg",
-            path_dir / "ffmpeg.exe"
-        ])
-
-    # Check all possible paths
-    for path in possible_paths:
-        try:
-            if path.exists():
-                # On Windows, .exe files are executable by default
-                if os.name == 'nt' and path.suffix.lower() == '.exe':
-                    logger.info(f"FFmpeg found at: {path}")
-                    return str(path.resolve())
-                # On Unix-like systems, check for executable bit
-                elif os.access(str(path), os.X_OK):
-                    logger.info(f"FFmpeg found at: {path}")
-                    return str(path.resolve())
-        except Exception as e:
-            logger.warning(f"Error checking {path}: {e}")
-            continue
-    
-    logger.error("FFmpeg not found in any of the standard locations")
-    logger.info("Please download FFmpeg from https://ffmpeg.org/download.html and add it to your PATH")
-    logger.info("or place ffmpeg.exe in the same directory as this script")
-    return None
 
 def _extract_artist(info: dict) -> str:
     """Extract artist information from video/audio metadata."""
@@ -188,32 +135,6 @@ def _process_metadata(file_path: Path, info: dict, progress_callback: Optional[C
     except Exception:
         # Continue execution even if metadata processing fails
         pass
-
-import sys
-
-def update_ytdlp():
-    """Updates yt-dlp to the latest version using pip (fast/silent when already up-to-date)."""
-    try:
-        logger.info("Checking for yt-dlp updates...")
-        python_executable = sys.executable
-        result = subprocess.run(
-            [python_executable, "-m", "pip", "install", "--upgrade", "--quiet", "yt-dlp"],
-            capture_output=True, text=True, timeout=30
-        )
-        if result.returncode == 0:
-            if "Successfully installed" in result.stdout:
-                logger.info("yt-dlp updated successfully.")
-            else:
-                logger.info("yt-dlp is already up-to-date.")
-        else:
-            logger.warning(f"yt-dlp update check returned code {result.returncode}")
-        return result.returncode == 0
-    except subprocess.TimeoutExpired:
-        logger.warning("yt-dlp update check timed out (30s), continuing with current version.")
-        return False
-    except Exception as e:
-        logger.error(f"Failed to update yt-dlp: {e}")
-        return False
 
 def download_media(
     url: str,
@@ -503,7 +424,6 @@ def download_media(
                         logger.error(f"Error processing {downloaded_file}: {str(e)}", exc_info=True)
                 
                 # Cleanup playlist residual thumbnails
-                # Cleanup playlist residual thumbnails
                 # Check both playlist folder and root output folder
                 folders_to_check = []
                 if playlist_folder and playlist_folder.exists():
@@ -543,7 +463,7 @@ def download_media(
                     
                     # Post-processing per il file singolo
                     if format.lower() == 'mp3' and (downloaded_file.suffix.lower() == '.mp3' or 
-                                                    (hasattr(download_info, 'ext') and download_info.ext.lower() == 'mp3')):
+                                                     (hasattr(download_info, 'ext') and download_info.ext.lower() == 'mp3')):
                         _process_metadata(downloaded_file, info, progress_callback)
                     
                     # Determina il nome finale del file

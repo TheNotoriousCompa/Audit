@@ -20,7 +20,7 @@ const electronAPI: ElectronAPI = {
     console.log('windowClose called');
     ipcRenderer.send('window:close');
   },
-  selectFolder: (): Promise<string> => {
+  selectFolder: (): Promise<string | null> => {
     console.log('selectFolder called from renderer');
     return ipcRenderer.invoke('dialog:openFolder').catch((error: Error) => {
       console.error('Error in selectFolder:', error);

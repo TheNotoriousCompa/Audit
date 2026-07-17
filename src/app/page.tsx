@@ -9,7 +9,7 @@ import Personalize from '@/components/sections/Personalize';
 import DownloadButton from '@/components/DownloadButton';
 import StatusMessage from '@/components/StatusMessage';
 import Info from '@/components/sections/Info';
-import type { DownloadProgress, DownloadStatus } from '@/types/electron';
+import type { DownloadProgress, DownloadResult, DownloadStatus } from '@/types/electron';
 
 export default function Home() {
     const [url, setUrl] = useState("");
@@ -316,41 +316,77 @@ export default function Home() {
         });
 
         try {
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("quality", quality);
-            // Backward compatibility for bitrate if needed by API
-            if (!isNaN(Number(quality))) {
-                formData.append("bitrate", quality);
+            const text = await file.text();
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+            
+            if (lines.length === 0) {
+                throw new Error("File is empty or contains no valid lines.");
             }
-            if (fps) formData.append("fps", fps.toString());
-            formData.append("timeout", timeout.toString());
-            formData.append("skipExisting", skipExisting ? "1" : "0");
-            if (outputFolder) formData.append("outputFolder", outputFolder);
 
-            const res = await fetch("/api/download?batch=1", {
-                method: "POST",
-                body: formData,
-            });
+            let successCount = 0;
+            let failCount = 0;
+            
+            isCancelled.current = false;
 
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.error || "Batch download failed.");
+            for (let i = 0; i < lines.length; i++) {
+                if (isCancelled.current) {
+                    setResult(`Batch cancelled. Success: ${successCount}, Failed: ${failCount}`);
+                    break;
+                }
+
+                const query = lines[i];
+                
+                // Update progress message for the overall batch
                 setProgress(prev => ({
                     ...prev,
-                    status: 'error',
-                    message: data.error || 'Batch download failed'
+                    status: 'downloading',
+                    message: `Batch: Processing item ${i + 1} of ${lines.length}...`,
                 }));
-            } else {
-                setResult("Batch download completed successfully");
+
+                const options: {
+                    outputDir?: string;
+                    quality: string;
+                    fps?: number;
+                    timeout: number;
+                    skipExisting: boolean;
+                    processPlaylist: boolean;
+                    format: 'mp3' | 'm4a' | 'flac' | 'wav' | 'opus' | 'best';
+                } = {
+                    outputDir: outputFolder || undefined,
+                    quality,
+                    fps: fps || undefined,
+                    timeout,
+                    skipExisting,
+                    processPlaylist: false,
+                    format: format as 'mp3' | 'm4a' | 'flac' | 'wav' | 'opus' | 'best'
+                };
+
+                try {
+                    const result = await window.electronAPI.convertYoutube(query, options);
+
+                    if (result.success) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                        console.error(`Failed to download ${query}:`, result.error);
+                    }
+                } catch (e) {
+                    failCount++;
+                    console.error(`Error downloading ${query}:`, e);
+                }
+            }
+
+            if (!isCancelled.current) {
+                setResult(`Batch completed. Success: ${successCount}, Failed: ${failCount}`);
                 setProgress(prev => ({
                     ...prev,
                     status: 'finished',
-                    percentage: 100
+                    percentage: 100,
+                    message: 'Batch completed'
                 }));
             }
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Network error or server not reachable';
+            const errorMessage = err instanceof Error ? err.message : 'Error processing file';
             setError(errorMessage);
             setProgress(prev => ({
                 ...prev,
@@ -436,10 +472,7 @@ export default function Home() {
 
             // Call Electron API with proper type assertion
             if (typeof window !== 'undefined' && window.electronAPI?.convertYoutube) {
-                const result = await window.electronAPI.convertYoutube(query, options) as
-                    | { success: true; filePath?: string }
-                    | { success: false; error?: string }
-                    | string;
+                const result: DownloadResult = await window.electronAPI.convertYoutube(query, options);
 
                 // Check if cancelled
                 if (isCancelled.current) {
@@ -447,12 +480,9 @@ export default function Home() {
                     return;
                 }
 
-                // Handle the response with proper type checking
-                if (typeof result === 'string') {
-                    setResult(result);
-                    setProgress(prev => ({ ...prev, status: 'finished', percentage: 100 }));
-                } else if (result.success) {
-                    setResult(`Downloaded successfully to: ${result.filePath || outputFolder}`);
+                if (result.success) {
+                    const savedPath = result.outputPath || result.message || outputFolder;
+                    setResult(`Downloaded successfully to: ${savedPath}`);
                     setProgress(prev => ({ ...prev, status: 'finished', percentage: 100 }));
                 } else {
                     setError(result.error || 'Failed to download');

@@ -10,6 +10,7 @@ export interface DownloadOptions {
   format?: DownloadFormat;
   quality?: string;
   bitrate?: number;
+  fps?: number;
   skipExisting?: boolean;
   timeout?: number;
   processPlaylist?: boolean;

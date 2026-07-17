@@ -19,8 +19,11 @@ Dependencies:
 - typing: For type hints
 - logging: For error and debug logging
 """
+import os
 import re
+import sys
 import logging
+import subprocess
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
@@ -78,10 +81,49 @@ def ensure_directory(path: Path) -> bool:
 
 def clean_youtube_url(url: str) -> str:
     """Clean YouTube URL by removing tracking parameters."""
-    if not url or 'youtube.com' not in url and 'youtu.be' not in url:
+    if not url or ('youtube.com' not in url and 'youtu.be' not in url):
         return url
         
     # Remove tracking parameters
     url = url.split('&list=')[0]  # Remove playlist reference
     url = url.split('&t=')[0]     # Remove timestamp
     return url
+
+def update_ytdlp():
+    """Updates yt-dlp to the latest version using pip (fast/silent when already up-to-date)."""
+    # Skip update if explicitly disabled via environment variable
+    if os.environ.get("SKIP_YTDLP_UPDATE") == "1":
+        logger.info("Skipping yt-dlp update (SKIP_YTDLP_UPDATE is set)")
+        return True
+
+    try:
+        logger.info("Checking for yt-dlp updates...")
+        python_executable = sys.executable
+        
+        # Use a slightly longer timeout for slow connections
+        process = subprocess.Popen(
+            [python_executable, "-m", "pip", "install", "--upgrade", "--quiet", "yt-dlp"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        try:
+            stdout, stderr = process.communicate(timeout=45)
+            if process.returncode == 0:
+                if "Successfully installed" in stdout:
+                    logger.info("yt-dlp updated successfully.")
+                else:
+                    logger.info("yt-dlp is already up-to-date.")
+                return True
+            else:
+                logger.warning(f"yt-dlp update returned code {process.returncode}. Stderr: {stderr}")
+                return False
+        except subprocess.TimeoutExpired:
+            process.kill()
+            logger.warning("yt-dlp update check timed out, continuing with current version.")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Failed to update yt-dlp: {e}")
+        return False

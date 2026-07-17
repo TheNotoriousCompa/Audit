@@ -74,17 +74,16 @@ class IPC:
     
     def send_result(self, success: bool, message: str = '', output_path: str = None, error: str = None) -> None:
         """Send a result back to the frontend."""
-        if not self.is_electron:
-            return
-            
         result = {
             'type': 'result',
-            'success': success,
-            'message': message or '',
-            'outputPath': output_path or '',
-            'error': error or ''
+            'data': {
+                'success': success,
+                'message': message or '',
+                'output_path': output_path or '',
+                'error': error or ''
+            }
         }
-        print(json.dumps(result))
+        print('\n' + json.dumps(result))
         sys.stdout.flush()
         
     def send_progress(self, progress_data: Dict[str, Any]) -> None:
@@ -93,33 +92,40 @@ class IPC:
         Args:
             progress_data: Dictionary containing progress information
         """
-        if not self.is_electron:
-            return
-            
         message = {
             'type': 'progress',
             'data': progress_data
         }
-        print(json.dumps(message))
+        print('\n' + json.dumps(message))
         sys.stdout.flush()
     
     def read_input(self):
-        """Read input from stdin (Electron) or command line."""
+        """Read input from command line or stdin (Electron)."""
+        # Try to parse CLI arguments first
+        try:
+            from interface.args_parser import parse_arguments
+        except ImportError:
+            from .args_parser import parse_arguments
+            
+        cli_args = parse_arguments()
+        
+        # If we have a URL or a batch file, return the CLI args
+        if cli_args.get('url') or cli_args.get('batch_file'):
+            return cli_args
+            
+        # If no CLI args, and we're under Electron, wait for stdin
         if self.is_electron:
             while True:
                 line = sys.stdin.readline().strip()
+                if not line:
+                    break
                 if line.startswith('{'):
                     try:
-                        json.loads(line)
-                        return line
+                        return json.loads(line)
                     except json.JSONDecodeError:
                         continue
-        else:
-            try:
-                from interface.args_parser import parse_arguments
-            except ImportError:
-                from .args_parser import parse_arguments
-            return parse_arguments()
+        
+        return cli_args
     
     def handle_electron_messages(self, process_func: Callable) -> None:
         """Handle messages from Electron in a loop."""
