@@ -10,11 +10,7 @@ permissions:
 
 jobs:
   publish:
-    name: Publish for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
+    runs-on: windows-latest
 
     steps:
       - name: Checkout Code
@@ -23,17 +19,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+          node-version: 22
 
       - name: Install Dependencies
         run: npm ci
-
-
 
       - name: Publish Release
         env:

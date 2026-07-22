@@ -99,11 +99,11 @@ wheels/
 .installed.cfg
 *.egg
 
-# Bundled binaries
+# Bundled binaries & runtimes
 ffmpeg/bin/*.exe
 ffmpeg/bin/*.dll
-python-runtime/**/*.exe
-python-runtime/**/*.dll
+python-runtime/
+resources/
 
 # Virtual Environment
 venv/
