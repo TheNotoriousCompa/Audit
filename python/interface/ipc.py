@@ -127,42 +127,5 @@ class IPC:
         
         return cli_args
     
-    def handle_electron_messages(self, process_func: Callable) -> None:
-        """Handle messages from Electron in a loop."""
-        if not self.is_electron:
-            return
-            
-        while True:
-            try:
-                line = sys.stdin.readline()
-                if not line:
-                    break
-                    
-                try:
-                    message = json.loads(line)
-                    message_type = message.get('type')
-                    data = message.get('data', {})
-                    
-                    if message_type == 'download':
-                        # Handle download message
-                        if data.get('reset_progress', False):
-                            self.progress_calculator.reset_state()
-                            
-                        success, output_path, message = process_func(data)
-                        self.send_result(success, message, str(output_path) if output_path else None)
-                        
-                    elif message_type == 'progress':
-                        # Process progress update through the calculator
-                        progress_data = self.progress_calculator.calculate_progress(data)
-                        self.send_progress(progress_data)
-                        
-                except json.JSONDecodeError as e:
-                    logger.error(f"Invalid message format: {e}")
-                    self.send_result(False, error=f"Invalid message format: {e}")
-                    
-            except Exception as e:
-                logger.exception("Error processing message")
-                self.send_result(False, error=f"Error: {str(e)}")
-
 # Global IPC instance
 ipc = IPC()

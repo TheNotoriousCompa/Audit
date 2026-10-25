@@ -6,37 +6,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
   --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
+  --color-ring: var(--ring);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -68,69 +39,15 @@
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
   --ring: oklch(0.705 0.015 286.067);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.21 0.006 285.885);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
 }
 
 .dark {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.92 0.004 286.32);
-  --primary-foreground: oklch(0.21 0.006 285.885);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.552 0.016 285.938);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
 }
 
 @layer base {
@@ -140,4 +57,185 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Frameless transparent window: keep the page transparent so only the
+   rounded app layers paint. Window corners match nav buttons (rounded-xl). */
+html,
+body {
+  background-color: transparent;
+}
+
+/* Mini player marquee for long titles ( Poweramp Bar design ). */
+@keyframes mini-marquee-scroll {
+  0%, 15% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.mini-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: mini-marquee-scroll 9s linear infinite;
+  will-change: transform;
+}
+
+/* Mini volume slider follows the Audit accent too. */
+.mini-vol {
+  accent-color: var(--audit-accent, #1ed760);
+}
+
+/* ---- Audit accent: single theme color driven by the style picker ----
+   Set --audit-accent on <main> from the user's wave line color. All
+   player/library greens go through these utilities (Spotify rule:
+   one functional accent only). */
+:root {
+  --audit-accent: #50C878;
+}
+
+.acc-text {
+  color: var(--audit-accent);
+}
+
+.acc-text-dim {
+  color: var(--audit-accent);
+  opacity: 0.6;
+}
+
+.acc-hover-text:hover {
+  color: var(--audit-accent);
+}
+
+.acc-soft-20 {
+  background-color: color-mix(in srgb, var(--audit-accent) 20%, transparent);
+}
+
+.acc-soft-30 {
+  background-color: color-mix(in srgb, var(--audit-accent) 30%, transparent);
+}
+
+.acc-soft-40 {
+  background-color: color-mix(in srgb, var(--audit-accent) 40%, transparent);
+}
+
+.acc-soft-50 {
+  background-color: color-mix(in srgb, var(--audit-accent) 50%, transparent);
+}
+
+.acc-hover-40:hover {
+  background-color: color-mix(in srgb, var(--audit-accent) 40%, transparent);
+}
+
+.acc-hover-50:hover {
+  background-color: color-mix(in srgb, var(--audit-accent) 50%, transparent);
+}
+
+.acc-hover-60:hover {
+  background-color: color-mix(in srgb, var(--audit-accent) 60%, transparent);
+}
+
+.acc-border {
+  border-color: color-mix(in srgb, var(--audit-accent) 45%, transparent);
+}
+
+.acc-range {
+  accent-color: var(--audit-accent);
+}
+
+.acc-focus:focus {
+  outline: 2px solid color-mix(in srgb, var(--audit-accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+/* Long lists (library, queue): skip layout/paint for offscreen rows.
+   Without this, showing the player with ~1400 tracks forced the browser
+   to lay out every row at once (hundreds of ms on first open). */
+.cv-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 36px;
+}
+
+/* Solid accent fill for primary CTAs (follows the wave color too). */
+.acc-bg {
+  background-color: var(--audit-accent);
+}
+
+.acc-bg-hover:hover {
+  background-color: color-mix(in srgb, var(--audit-accent) 85%, black);
+}
+
+.acc-shadow-hover:hover {
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--audit-accent) 30%, transparent);
+}
+
+/* Accent hover inside a Tailwind `group` (for icon chips, chevrons). */
+.group:hover .acc-group-hover-text {
+  color: var(--audit-accent);
+}
+
+/* ---- Apple-style frosted glass materials ----
+   Apple "regular material": heavy blur + saturation boost, a very
+   translucent white fill, a hairline border with a top highlight and a
+   soft, wide shadow. Reused by pills, panels and popovers.
+   Blur radii are kept moderate and layers are GPU-promoted
+   (will-change) so toggling overlays or tabs never re-rasters the
+   whole window on the main thread. */
+.glass {
+  background-color: rgba(16, 16, 18, 0.55);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.45);
+  will-change: transform;
+}
+
+.glass-hover:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.glass-active {
+  background-color: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Nested glass (panel inside the glass card): slightly denser fill so the
+   double blur doesn't wash the content out. */
+.glass-inset {
+  /* Nested glass sits on an already-blurred ancestor (card/popover), so a
+     second backdrop-filter only doubled raster cost on first paint without
+     looking different. Solid translucent fill instead. */
+  background-color: rgba(18, 18, 21, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Base layer: main card and panels that sit directly over the wallpaper.
+   Lighter blur so the desktop glow still breathes through. */
+.glass-base {
+  background-color: rgba(12, 12, 14, 0.62);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+    0 24px 48px rgba(0, 0, 0, 0.5);
+  will-change: transform;
+}
+
+/* Floating popover layer (macOS popover material): darkest, most opaque
+   fill with the strongest blur, so content below reads as a smudge. */
+.glass-popover {
+  background-color: rgba(14, 14, 17, 0.82);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.07),
+    0 16px 40px rgba(0, 0, 0, 0.6);
+  will-change: transform;
 }

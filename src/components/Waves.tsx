@@ -191,6 +191,8 @@ const Waves: React.FC<WavesProps> = ({
   });
 
   const frameIdRef = useRef<number | null>(null);
+  const lastTickRef = useRef<number>(0);
+  const lastCssRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   useEffect(() => {
     configRef.current = {
@@ -255,21 +257,27 @@ const Waves: React.FC<WavesProps> = ({
       const mouse = mouseRef.current;
       const noise = noiseRef.current;
       const { waveSpeedX, waveSpeedY, waveAmpX, waveAmpY, friction, tension, maxCursorMove } = configRef.current;
+      // The cursor impulse is only meaningful while the pointer is actually
+      // moving; skipping the per-point distance math when idle keeps 60fps
+      // cheap without any visible difference.
+      const cursorActive = mouse.set && mouse.vs > 0.05;
       lines.forEach(pts => {
         pts.forEach(p => {
           const move = noise.perlin2((p.x + time * waveSpeedX) * 0.002, (p.y + time * waveSpeedY) * 0.0015) * 12;
           p.wave.x = Math.cos(move) * waveAmpX;
           p.wave.y = Math.sin(move) * waveAmpY;
 
-          const dx = p.x - mouse.sx,
-            dy = p.y - mouse.sy;
-          const dist = Math.hypot(dx, dy);
-          const l = Math.max(175, mouse.vs);
-          if (dist < l) {
-            const s = 1 - dist / l;
-            const f = Math.cos(dist * 0.001) * s;
-            p.cursor.vx += Math.cos(mouse.a) * f * l * mouse.vs * 0.00065;
-            p.cursor.vy += Math.sin(mouse.a) * f * l * mouse.vs * 0.00065;
+          if (cursorActive) {
+            const dx = p.x - mouse.sx,
+              dy = p.y - mouse.sy;
+            const dist = Math.hypot(dx, dy);
+            const l = Math.max(175, mouse.vs);
+            if (dist < l) {
+              const s = 1 - dist / l;
+              const f = Math.cos(dist * 0.001) * s;
+              p.cursor.vx += Math.cos(mouse.a) * f * l * mouse.vs * 0.00065;
+              p.cursor.vy += Math.sin(mouse.a) * f * l * mouse.vs * 0.00065;
+            }
           }
 
           p.cursor.vx += (0 - p.cursor.x) * tension;
@@ -284,12 +292,6 @@ const Waves: React.FC<WavesProps> = ({
       });
     }
 
-    function moved(point: Point, withCursor = true): { x: number; y: number } {
-      const x = point.x + point.wave.x + (withCursor ? point.cursor.x : 0);
-      const y = point.y + point.wave.y + (withCursor ? point.cursor.y : 0);
-      return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
-    }
-
     function drawLines() {
       const { width, height } = boundingRef.current;
       const ctx = ctxRef.current;
@@ -297,22 +299,36 @@ const Waves: React.FC<WavesProps> = ({
       ctx.clearRect(0, 0, width, height);
       ctx.beginPath();
       ctx.strokeStyle = configRef.current.lineColor;
-      linesRef.current.forEach(points => {
-        let p1 = moved(points[0], false);
-        ctx.moveTo(p1.x, p1.y);
-        points.forEach((p, idx) => {
-          const isLast = idx === points.length - 1;
-          p1 = moved(p, !isLast);
-          const p2 = moved(points[idx + 1] || points[points.length - 1], !isLast);
-          ctx.lineTo(p1.x, p1.y);
-          if (isLast) ctx.moveTo(p2.x, p2.y);
-        });
-      });
+      const lines = linesRef.current;
+      // Allocation-free polyline building: the previous implementation created
+      // two {x,y} objects per point per frame, which kept the GC busy.
+      for (let li = 0; li < lines.length; li++) {
+        const points = lines[li];
+        const last = points.length - 1;
+        if (last < 1) continue;
+        const head = points[0];
+        ctx.moveTo(head.x + head.wave.x, head.y + head.wave.y);
+        for (let i = 1; i <= last; i++) {
+          const p = points[i];
+          const withCursor = i !== last;
+          ctx.lineTo(
+            p.x + p.wave.x + (withCursor ? p.cursor.x : 0),
+            p.y + p.wave.y + (withCursor ? p.cursor.y : 0)
+          );
+        }
+      }
       ctx.stroke();
     }
 
     function tick(t: number) {
       if (!container) return;
+      // Target 60fps (16ms budget): a full-screen canvas at display refresh
+      // (144Hz) burned most of the main thread and made clicks/hover hitch.
+      if (t - lastTickRef.current < 15) {
+        frameIdRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      lastTickRef.current = t;
       const mouse = mouseRef.current;
       mouse.sx += (mouse.x - mouse.sx) * 0.1;
       mouse.sy += (mouse.y - mouse.sy) * 0.1;
@@ -325,8 +341,14 @@ const Waves: React.FC<WavesProps> = ({
       mouse.lx = mouse.x;
       mouse.ly = mouse.y;
       mouse.a = Math.atan2(dy, dx);
-      container.style.setProperty('--x', `${mouse.sx}px`);
-      container.style.setProperty('--y', `${mouse.sy}px`);
+      // Only write the CSS custom properties when the smoothed cursor moved;
+      // a per-frame write invalidates style for the whole subtree.
+      if (Math.abs(mouse.sx - lastCssRef.current.x) > 0.5 || Math.abs(mouse.sy - lastCssRef.current.y) > 0.5) {
+        lastCssRef.current.x = mouse.sx;
+        lastCssRef.current.y = mouse.sy;
+        container.style.setProperty('--x', `${mouse.sx}px`);
+        container.style.setProperty('--y', `${mouse.sy}px`);
+      }
 
       movePoints(t);
       drawLines();
@@ -358,20 +380,35 @@ const Waves: React.FC<WavesProps> = ({
       }
     }
 
+    function startLoop() {
+      if (frameIdRef.current !== null) return;
+      frameIdRef.current = requestAnimationFrame(tick);
+    }
+    function stopLoop() {
+      if (frameIdRef.current !== null) {
+        cancelAnimationFrame(frameIdRef.current);
+        frameIdRef.current = null;
+      }
+    }
+    function onVisibility() {
+      if (document.hidden) stopLoop();
+      else startLoop();
+    }
+
     setSize();
     setLines();
-    frameIdRef.current = requestAnimationFrame(tick);
+    startLoop();
     window.addEventListener('resize', onResize);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('touchmove', onTouchMove);
-      if (frameIdRef.current !== null) {
-        cancelAnimationFrame(frameIdRef.current);
-      }
+      document.removeEventListener('visibilitychange', onVisibility);
+      stopLoop();
     };
   }, []);
 

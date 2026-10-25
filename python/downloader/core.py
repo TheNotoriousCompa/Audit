@@ -24,20 +24,39 @@ from .progress import reset_progress_state, set_playlist_info, calculate_progres
 
 logger = logging.getLogger(__name__)
 
+try:
+    from library.tags_norm import split_artist_title, clean_title, clean_artist
+except ImportError:
+    try:
+        from ..library.tags_norm import split_artist_title, clean_title, clean_artist
+    except ImportError:
+        split_artist_title = None  # type: ignore
+        clean_title = lambda s: (s or "").strip()  # type: ignore
+        clean_artist = lambda s: (s or "").strip()  # type: ignore
+
 def _extract_artist(info: dict) -> str:
-    """Extract artist information from video/audio metadata."""
+    """Extract artist information from video/audio metadata.
+
+    Prefers an explicit artist field, then an 'Artist - Title' split of the
+    video title (cleaned), then the channel name with cruft stripped.
+    """
     # 1. Try direct artist field
     if info.get('artist'):
-        return info['artist']
-    
-    # 2. Try uploader (channel name)
+        return clean_artist(info['artist'])
+
+    # 2. Try to extract from title (common format: "Artist - Song")
+    title = info.get('title') or ''
+    if split_artist_title and title:
+        split = split_artist_title(title)
+        if split and split[0]:
+            return clean_artist(split[0])
+    elif ' - ' in title:
+        return title.split(' - ')[0].strip()
+
+    # 3. Try uploader (channel name), cleaned
     if info.get('uploader'):
-        return info['uploader']
-    
-    # 3. Try to extract from title (common format: "Artist - Song")
-    if 'title' in info and ' - ' in info['title']:
-        return info['title'].split(' - ')[0].strip()
-    
+        return clean_artist(info['uploader'])
+
     # 4. Try to extract from description
     if info.get('description'):
         import re
@@ -48,14 +67,14 @@ def _extract_artist(info: dict) -> str:
             r'(?i)by\s+([^\n]+)',
             r'(?i)da\s+([^\n]+)'
         ]
-        
+
         for pattern in patterns:
             match = re.search(pattern, info['description'])
             if match:
                 artist = match.group(1).strip()
                 if artist:  # Make sure we found something
-                    return artist
-    
+                    return clean_artist(artist)
+
     # 5. Last resort: return empty string
     return ''
 
@@ -112,17 +131,25 @@ def _process_metadata(file_path: Path, info: dict, progress_callback: Optional[C
         
         # Extract artist information
         artist = _extract_artist(info)
-        album_artist = info.get('artist') or artist or info.get('uploader', '')
-        
+        album_artist = info.get('artist') or artist or clean_artist(info.get('uploader', ''))
+
+        # Clean the title: if it splits as "Artist - Title", keep the song part.
+        raw_title = info.get('title', '')
+        title = clean_title(raw_title)
+        if split_artist_title:
+            split = split_artist_title(raw_title)
+            if split and split[1] and clean_artist(split[0]).lower() == (artist or '').lower():
+                title = clean_title(split[1])
+
         # Log per debug
         logger.info(f"Processing metadata for: {info.get('title', 'Unknown')}")
         logger.info(f"Artist: {artist}, Uploader: {info.get('uploader', 'Not found')}")
         logger.info(f"Album: {info.get('album', 'Not found')}, Album Artist: {album_artist}")
-        
+
         # Process metadata with all available info
         set_mp3_metadata(
             file_path=file_path,
-            title=info.get('title', ''),
+            title=title,
             artist=artist,
             album=info.get('album', ''),
             album_artist=album_artist,

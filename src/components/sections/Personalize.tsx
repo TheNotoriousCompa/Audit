@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw } from 'lucide-react';
+import ColorPicker from './ColorPicker';
 
 interface PersonalizeProps {
   show: boolean;
@@ -11,6 +12,13 @@ interface PersonalizeProps {
   };
 }
 
+type ColorKey = 'lineColor' | 'backgroundColor';
+
+const ROWS: { key: ColorKey; label: string; hint: string; fallback: string }[] = [
+  { key: 'lineColor', label: 'Accent', hint: 'Wave, buttons, highlights', fallback: '#50C878' },
+  { key: 'backgroundColor', label: 'Background', hint: 'Behind the waves', fallback: '#000000' },
+];
+
 const Personalize: React.FC<PersonalizeProps> = ({
   show,
   onColorChange,
@@ -20,6 +28,7 @@ const Personalize: React.FC<PersonalizeProps> = ({
     lineColor: currentColors.lineColor,
     backgroundColor: currentColors.backgroundColor,
   });
+  const [openPicker, setOpenPicker] = useState<ColorKey | null>(null);
 
   // Update local state when currentColors prop changes
   useEffect(() => {
@@ -29,140 +38,89 @@ const Personalize: React.FC<PersonalizeProps> = ({
     });
   }, [currentColors]);
 
-  const handleColorChange = (type: 'lineColor' | 'backgroundColor', value: string) => {
-    // Ensure the color is in the correct format
+  const handleColorChange = (type: ColorKey, value: string) => {
     const formattedValue = value.startsWith('#') ? value : `#${value}`;
-    
-    setColors(prev => ({
-      ...prev,
-      [type]: formattedValue
-    }));
+    setColors((prev) => ({ ...prev, [type]: formattedValue }));
     onColorChange(type, formattedValue);
   };
 
-  const resetToDefault = (type: 'lineColor' | 'backgroundColor') => {
-    const defaultValue = type === 'lineColor' ? '#50C878' : '#000000';
-    handleColorChange(type, defaultValue);
+  const resetToDefault = (type: ColorKey) => {
+    const row = ROWS.find((r) => r.key === type);
+    handleColorChange(type, row?.fallback ?? '#000000');
   };
 
   return (
     <AnimatePresence>
       {show && (
         <motion.div
-          initial={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0, overflow: 'hidden' }}
-          animate={{
-            opacity: 1,
-            height: 'auto',
-            marginTop: '1.5rem',
-            marginBottom: '0',
-            transition: {
-              opacity: { duration: 0.3, ease: 'easeInOut' },
-              height: { duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] },
-              margin: { duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] }
-            }
-          }}
-          exit={{
-            opacity: 0,
-            height: 0,
-            marginTop: 0,
-            marginBottom: 0,
-            transition: {
-              opacity: { duration: 0.2, ease: 'easeInOut' },
-              height: { duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] },
-              margin: { duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }
-            }
-          }}
-          className="overflow-hidden"
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0, transition: { duration: 0.18, ease: 'easeOut' } }}
+          exit={{ opacity: 0, y: -6, transition: { duration: 0.12, ease: 'easeIn' } }}
+          className="w-full"
         >
-          <div className="p-6 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 shadow-lg">
-            <h3 className="text-lg font-medium text-white mb-6">Personalize Colors</h3>
-            <div className="space-y-6">
-              {/* Line Color Picker */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-gray-300">
-                    Wave Line Color
-                  </label>
-                  <button
-                    onClick={() => resetToDefault('lineColor')}
-                    className="p-1 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-white/10"
-                    title="Reset to default"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <input
-                      type="color"
-                      value={colors.lineColor}
-                      onChange={(e) => handleColorChange('lineColor', e.target.value)}
-                      className="w-8 h-8 cursor-pointer bg-transparent border-0"
-                      style={{
-                        WebkitAppearance: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 0,
-                      }}
-                    />
-                    <div 
-                      className="absolute inset-0 pointer-events-none"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <input
-                      type="text"
-                      value={colors.lineColor}
-                      onChange={(e) => handleColorChange('lineColor', e.target.value)}
-                      className="w-full px-2 py-1 text-xs bg-white/5 border border-white/10 rounded-md text-gray-200 focus:ring-1 focus:ring-white/30 focus:border-white/30 outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
+          {/* Header — sits directly on the popover, no nested surface */}
+          <div className="flex items-center gap-2 px-1 pb-2 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full acc-bg shrink-0" />
+            <h2 className="text-sm font-semibold text-white">Colors</h2>
+            <span className="text-[11px] text-gray-500 truncate">Theme</span>
+          </div>
 
-              {/* Background Color Picker */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-gray-300">
-                    Background Color
-                  </label>
-                  <button
-                    onClick={() => resetToDefault('backgroundColor')}
-                    className="p-1 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-white/10"
-                    title="Reset to default"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <input
-                      type="color"
-                      value={colors.backgroundColor}
-                      onChange={(e) => handleColorChange('backgroundColor', e.target.value)}
-                      className="w-8 h-8 cursor-pointer bg-transparent border-0"
-                      style={{
-                        WebkitAppearance: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 0,
-                      }}
-                    />
-                    <div 
-                      className="absolute inset-0 pointer-events-none"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
+          {/* Single bordered group with dividers instead of stacked cards */}
+          <div className="rounded-xl border border-white/5 divide-y divide-white/5">
+            {ROWS.map(({ key, label, hint }) => {
+              const expanded = openPicker === key;
+              return (
+                <div key={key}>
+                  <div className="flex items-center gap-2.5 px-3 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setOpenPicker(expanded ? null : key)}
+                      aria-expanded={expanded}
+                      title={`${label} color`}
+                      className={`relative w-6 h-6 rounded-full overflow-hidden shrink-0 cursor-pointer transition-shadow ${
+                        expanded ? 'ring-2 ring-white/70' : 'ring-1 ring-white/15 hover:ring-white/40'
+                      }`}
+                    >
+                      <span className="absolute inset-0" style={{ background: colors[key] }} />
+                    </button>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-gray-200">{label}</div>
+                      <div className="text-[10px] text-gray-500 truncate">{hint}</div>
+                    </div>
+
                     <input
                       type="text"
-                      value={colors.backgroundColor}
-                      onChange={(e) => handleColorChange('backgroundColor', e.target.value)}
-                      className="w-full px-2 py-1 text-xs bg-white/5 border border-white/10 rounded-md text-gray-200 focus:ring-1 focus:ring-white/30 focus:border-white/30 outline-none"
+                      value={colors[key]}
+                      onChange={(e) => handleColorChange(key, e.target.value)}
+                      spellCheck={false}
+                      className="w-[74px] px-1.5 py-1 text-[11px] font-mono text-center bg-white/5 border border-white/10 rounded-md text-gray-200 outline-none focus:ring-1 focus:ring-white/20"
                     />
+
+                    <button
+                      onClick={() => resetToDefault(key)}
+                      className="p-1 rounded-lg text-gray-500 acc-hover-text transition-colors shrink-0"
+                      title="Reset to default"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
                   </div>
+
+                  {expanded && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0, transition: { duration: 0.15, ease: 'easeOut' } }}
+                      className="px-3 pb-3"
+                    >
+                      <ColorPicker
+                        value={colors[key]}
+                        onChange={(hex) => handleColorChange(key, hex)}
+                      />
+                    </motion.div>
+                  )}
                 </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </motion.div>
       )}

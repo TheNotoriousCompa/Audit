@@ -27,32 +27,20 @@ const AdvancedOptions: React.FC<AdvancedOptionsProps> = ({
       {show && (
         <motion.div
           ref={containerRef}
-          initial={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0, overflow: 'hidden' }}
+          initial={{ opacity: 0, y: -6 }}
           animate={{
             opacity: 1,
-            height: 'auto',
-            marginTop: '1.5rem',
-            marginBottom: '0',
-            transition: {
-              opacity: { duration: 0.3, ease: 'easeInOut' },
-              height: { duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] },
-              margin: { duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] }
-            }
+            y: 0,
+            transition: { duration: 0.22, ease: 'easeOut' }
           }}
           exit={{
             opacity: 0,
-            height: 0,
-            marginTop: 0,
-            marginBottom: 0,
-            transition: {
-              opacity: { duration: 0.2, ease: 'easeInOut' },
-              height: { duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] },
-              margin: { duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }
-            }
+            y: -6,
+            transition: { duration: 0.15, ease: 'easeIn' }
           }}
           className="overflow-hidden"
         >
-          <div className="p-6 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 shadow-lg">
+          <div className="glass-inset rounded-2xl p-4 sm:p-5">
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 {/* Format Selection */}

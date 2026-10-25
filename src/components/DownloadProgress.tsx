@@ -54,7 +54,7 @@ const DownloadProgressComponent: React.FC<DownloadProgressProps> = ({ progress }
   const { color, bg, icon: Icon } = getStatusInfo();
 
   return (
-    <div className="w-full bg-black/40 backdrop-blur-md rounded-2xl p-5 border border-white/10 shadow-xl transition-all duration-300 hover:border-white/20 hover:shadow-2xl hover:bg-black/50">
+    <div className="w-full glass-inset rounded-2xl p-5 transition-all duration-300 hover:border-white/20">
 
       {/* Header Row: Icon + Main Info */}
       <div className="flex items-start justify-between mb-4">
@@ -104,11 +104,11 @@ const DownloadProgressComponent: React.FC<DownloadProgressProps> = ({ progress }
                   <div className="w-full space-y-1 mt-1">
                     <div className="flex justify-between text-[11px] text-gray-400">
                       <span className="opacity-70">Brano corrente</span>
-                      <span className="text-blue-300 font-mono">{filePercent.toFixed(0)}%</span>
+                      <span className="acc-text font-mono">{filePercent.toFixed(0)}%</span>
                     </div>
                     <div className="h-1.5 bg-gray-800/50 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-emerald-500 transition-all duration-300"
+                        className="h-full acc-bg transition-all duration-300"
                         style={{ width: `${filePercent}%` }}
                       />
                     </div>
@@ -126,13 +126,13 @@ const DownloadProgressComponent: React.FC<DownloadProgressProps> = ({ progress }
                   </div>
                   {status === 'downloading' && isPlaylist && (
                     <div className="w-full flex items-center gap-2">
-                      <div className="h-1.5 bg-gray-800/50 rounded-full flex-1 overflow-hidden">
+                      <div className="h-1.5 bg-gray-800/50 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-emerald-500 transition-all duration-300"
+                          className="h-full acc-bg transition-all duration-300"
                           style={{ width: `${filePercent}%` }}
                         />
                       </div>
-                      <span className="text-xs text-emerald-300 font-mono w-10 text-right">
+                      <span className="text-xs acc-text font-mono w-10 text-right">
                         {filePercent.toFixed(0)}%
                       </span>
                     </div>
@@ -181,12 +181,12 @@ const DownloadProgressComponent: React.FC<DownloadProgressProps> = ({ progress }
       {/* Main Progress Bar - General Progress (Moved to bottom) */}
       {status === 'downloading' && (
         <div className="relative h-2.5 bg-gray-800/30 rounded-full overflow-hidden mb-1 border border-white/5">
-          <div className="absolute inset-0 bg-linear-to-r from-emerald-500/10 via-emerald-400/10 to-emerald-500/10 opacity-30" />
+          <div className="absolute inset-0 acc-soft-20 opacity-30" />
           <div
             className={`absolute left-0 top-0 h-full ${bg} transition-all duration-300 ease-out`}
             style={{
               width: `${displayPercent}%`,
-              background: 'linear-gradient(90deg, #50C878, #45b069)'
+              background: 'linear-gradient(90deg, var(--audit-accent), color-mix(in srgb, var(--audit-accent) 85%, black))'
             }}
           />
         </div>

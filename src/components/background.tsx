@@ -4,15 +4,18 @@ import Waves from './Waves';
 interface BackgroundProps {
   lineColor?: string;
   backgroundColor?: string;
+  className?: string;
 }
 
 const Background: React.FC<BackgroundProps> = ({
   lineColor = '#10601e',
-  backgroundColor = 'rgba(0, 0, 0, 1)'
+  backgroundColor = 'rgba(0, 0, 0, 1)',
+  className = ''
 }) => (
   <Waves
     lineColor={lineColor}
     backgroundColor={backgroundColor}
+    className={className}
     waveSpeedX={0.02}
     waveSpeedY={0.01}
     waveAmpX={40}

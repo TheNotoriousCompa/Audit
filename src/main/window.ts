@@ -11,21 +11,50 @@ export function initRenderer(): void {
   loadURL = serve({ directory: 'dist/renderer' });
 }
 
-export function createWindow(): BrowserWindow {
+export function getPreloadPath(): string {
   const appRoot = app.getAppPath();
   let preloadPath: string;
-  let iconPath: string;
-
   if (isDev) {
     preloadPath = path.join(__dirname, '..', '..', 'dist', 'preload', 'preload.js');
-    iconPath = path.join(__dirname, '..', '..', 'Public', 'AUDIT.png');
   } else {
     preloadPath = path.join(appRoot, 'dist', 'preload', 'preload.js');
+  }
+  if (!path.isAbsolute(preloadPath)) preloadPath = path.resolve(preloadPath);
+  return preloadPath;
+}
+
+export function getIconPath(): string {
+  const appRoot = app.getAppPath();
+  let iconPath: string;
+  if (isDev) {
+    iconPath = path.join(__dirname, '..', '..', 'Public', 'AUDIT.png');
+  } else {
     iconPath = path.join(appRoot, 'Public', 'AUDIT.png');
   }
-
-  if (!path.isAbsolute(preloadPath)) preloadPath = path.resolve(preloadPath);
   if (!path.isAbsolute(iconPath)) iconPath = path.resolve(iconPath);
+  return iconPath;
+}
+
+/** Load the renderer into any window (main or mini). */
+export function loadMainContent(win: BrowserWindow, mini = false): void {
+  if (isDev) {
+    win.loadURL(mini ? 'http://localhost:3000/#mini' : 'http://localhost:3000');
+    return;
+  }
+  if (!loadURL) {
+    logToFile('electron-serve not initialized');
+    throw new Error('electron-serve not initialized');
+  }
+  loadURL(win).catch((err: unknown) => {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    logToFile(`Failed to load production HTML: ${errMsg}`);
+    console.error('Failed to load production HTML:', err);
+  });
+}
+
+export function createWindow(): BrowserWindow {
+  const preloadPath = getPreloadPath();
+  const iconPath = getIconPath();
 
   logToFile(`Final preload path: ${preloadPath}`);
   logToFile(`Final icon path: ${iconPath}`);
@@ -52,17 +81,14 @@ export function createWindow(): BrowserWindow {
   });
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:3000');
+    loadMainContent(mainWindow);
   } else {
-    if (!loadURL) {
+    try {
+      loadMainContent(mainWindow);
+    } catch {
       logToFile('electron-serve not initialized');
       throw new Error('electron-serve not initialized');
     }
-    loadURL(mainWindow).catch((err: unknown) => {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      logToFile(`Failed to load production HTML: ${errMsg}`);
-      console.error('Failed to load production HTML:', err);
-    });
   }
 
   mainWindow.once('ready-to-show', () => {

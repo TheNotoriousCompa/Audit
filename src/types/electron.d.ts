@@ -67,6 +67,73 @@ export interface DownloadProgress {
 // Type for progress callback that can handle partial progress data
 type ProgressCallback = (event: IpcRendererEvent, progress: Partial<DownloadProgress> & Record<string, unknown>) => void;
 
+// A single audio file in the local library.
+export interface Track {
+  path: string;
+  filename: string;
+  size: number;
+  mtime: number;
+  ext: string;
+  title: string;
+  artist: string;
+  album: string;
+  genre: string;
+  duration: number;
+  has_art: boolean;
+  lrc: boolean;
+}
+
+export interface LibraryScanResult {
+  success: boolean;
+  root: string;
+  count: number;
+  tracks: Track[];
+  error: string;
+}
+
+export interface LibraryCache {
+  version: number;
+  roots: string[];
+  scannedAt: number;
+  tracks: Track[];
+}
+
+export interface TrackArt {
+  found: boolean;
+  mime: string;
+  dataUrl: string;
+  source: 'embedded' | 'folder' | '';
+  error: string;
+}
+
+export interface WriteTagFields {
+  title: string;
+  artist: string;
+  album: string;
+  genre: string;
+}
+
+export interface WriteTagResult {
+  success: boolean;
+  track: Track | null;
+  error: string;
+}
+
+export type MiniCommand = 'toggle' | 'prev' | 'next' | { type: 'seek'; pos: number } | { type: 'volume'; vol: number };
+
+export interface PlayerMiniState {
+  playing: boolean;
+  title: string;
+  artist: string;
+  pos: number;
+  dur: number;
+  vol: number;
+  accent: string;
+  art: string | null;
+  artPath: string | null;
+  hasQueue: boolean;
+}
+
 // Types for the Electron API
 export interface ElectronAPI {
   // Window control functions
@@ -79,8 +146,23 @@ export interface ElectronAPI {
   onDownloadProgress: (callback: ProgressCallback) => void;
   removeProgressListener: (callback: ProgressCallback) => void;
   selectFolder: () => Promise<string | null>;
-  downloadYoutube: (url: string, options: DownloadOptions) => Promise<DownloadResult>;
   stopDownload: () => void;
+
+  // Local library (player)
+  scanLibrary: (dir: string) => Promise<LibraryScanResult>;
+  getTrackArt: (filePath: string) => Promise<TrackArt>;
+  writeTags: (filePath: string, fields: WriteTagFields) => Promise<WriteTagResult>;
+  loadLibraryCache: () => Promise<LibraryCache>;
+  saveLibraryCache: (cache: LibraryCache) => Promise<boolean>;
+
+  // Mini player remote control
+  onMiniCommand: (cb: (cmd: MiniCommand) => void) => void;
+  sendPlayerState: (state: PlayerMiniState) => void;
+  onPlayerState: (cb: (state: PlayerMiniState) => void) => void;
+  miniControl: (cmd: MiniCommand) => void;
+  expandApp: () => void;
+  closeMini: () => void;
+  onMiniMode: (cb: () => void) => void;
 }
 
 // Extend React CSSProperties for custom properties

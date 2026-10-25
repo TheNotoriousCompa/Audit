@@ -9,7 +9,7 @@ export const StatusMessage: React.FC<StatusMessageProps> = ({ result, error }) =
   if (!result && !error) return null;
 
   return (
-    <div className="w-full mt-6 space-y-4">
+    <div className="w-full space-y-4">
       {result && (
         <div className="p-4 bg-green-900/30 border border-green-800/50 rounded-xl">
           <p className="text-green-400 font-medium">

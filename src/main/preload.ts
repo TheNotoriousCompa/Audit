@@ -1,7 +1,7 @@
 // preload.ts
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 // Importa i tipi dal file centrale
-import type { DownloadProgress, DownloadOptions, DownloadResult, ElectronAPI } from '../types/electron.d.ts';
+import type { DownloadProgress, DownloadOptions, ElectronAPI, LibraryScanResult, TrackArt, MiniCommand, PlayerMiniState, WriteTagFields, WriteTagResult, LibraryCache } from '../types/electron.d.ts';
 
 // Log che preload script è caricato
 console.log('Preload script loaded');
@@ -27,9 +27,6 @@ const electronAPI: ElectronAPI = {
       throw error;
     });
   },
-  downloadYoutube: (url: string, options: DownloadOptions): Promise<DownloadResult> => {
-    return ipcRenderer.invoke('download:youtube', { url, options });
-  },
   onDownloadProgress: (callback: (event: IpcRendererEvent, progress: Partial<DownloadProgress> & Record<string, unknown>) => void): void => {
     ipcRenderer.on('download-progress', callback);
   },
@@ -43,6 +40,43 @@ const electronAPI: ElectronAPI = {
   stopDownload: () => {
     console.log('stopDownload called');
     ipcRenderer.send('download:stop');
+  },
+  scanLibrary: (dir: string): Promise<LibraryScanResult> => {
+    console.log('scanLibrary called for:', dir);
+    return ipcRenderer.invoke('library:scan', dir);
+  },
+  getTrackArt: (filePath: string): Promise<TrackArt> => {
+    return ipcRenderer.invoke('library:art', filePath);
+  },
+  writeTags: (filePath: string, fields: WriteTagFields): Promise<WriteTagResult> => {
+    return ipcRenderer.invoke('library:writeTags', filePath, fields);
+  },
+  loadLibraryCache: (): Promise<LibraryCache> => {
+    return ipcRenderer.invoke('library:loadCache');
+  },
+  saveLibraryCache: (cache: LibraryCache): Promise<boolean> => {
+    return ipcRenderer.invoke('library:saveCache', cache);
+  },
+  onMiniCommand: (cb: (cmd: MiniCommand) => void): void => {
+    ipcRenderer.on('mini:command', (_event, cmd: MiniCommand) => cb(cmd));
+  },
+  sendPlayerState: (state: PlayerMiniState): void => {
+    ipcRenderer.send('player:state', state);
+  },
+  onPlayerState: (cb: (state: PlayerMiniState) => void): void => {
+    ipcRenderer.on('player:state', (_event, state: PlayerMiniState) => cb(state));
+  },
+  miniControl: (cmd: MiniCommand): void => {
+    ipcRenderer.send('mini:control', cmd);
+  },
+  expandApp: (): void => {
+    ipcRenderer.send('mini:expand');
+  },
+  closeMini: (): void => {
+    ipcRenderer.send('mini:close');
+  },
+  onMiniMode: (cb: () => void): void => {
+    ipcRenderer.once('mini:mode', () => cb());
   }
 };
 

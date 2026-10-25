@@ -1,15 +1,50 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Footer from '@/components/sections/Footer';
 import Background from "@/components/background";
 import DownloadProgressComponent from "@/components/DownloadProgress";
-import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Settings, Palette } from "lucide-react";
+import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Settings, Palette, ArrowDownToLine, ListMusic } from "lucide-react";
 import AdvancedOptions from '@/components/sections/AdvancedOptions';
 import Personalize from '@/components/sections/Personalize';
 import DownloadButton from '@/components/DownloadButton';
 import StatusMessage from '@/components/StatusMessage';
+import PlayerSection from '@/components/player/PlayerSection';
+import MiniView from '@/components/player/MiniView';
 import Info from '@/components/sections/Info';
 import type { DownloadProgress, DownloadResult, DownloadStatus } from '@/types/electron';
+
+const defaultProgress = (overrides?: Partial<DownloadProgress>): DownloadProgress => ({
+    percentage: 0,
+    downloaded: 0,
+    total: 0,
+    speed: 0,
+    speed_str: '0 B/s',
+    eta: 0,
+    status: 'ready',
+    message: '',
+    _percent_str: '0%',
+    _speed_str: '0 B/s',
+    _eta_str: '--:--',
+    downloaded_bytes: 0,
+    total_bytes: 0,
+    currentItem: 0,
+    totalItems: 0,
+    currentFile: '',
+    isPlaylist: false,
+    filename: '',
+    speed_raw: 0,
+    timestamp: Date.now(),
+    ...overrides
+});
+
+function hasPlaylistParams(str: string): boolean {
+    try {
+        const urlObj = new URL(str);
+        return urlObj.searchParams.has('list') || urlObj.pathname.includes('/playlist');
+    } catch {
+        return false;
+    }
+}
 
 export default function Home() {
     const [url, setUrl] = useState("");
@@ -22,54 +57,99 @@ export default function Home() {
     const [fps, setFps] = useState<number | null>(null);
     const [showAdvanced, setShowAdvanced] = useState(false);
     // Advanced options removed from UI but keeping defaults
-    const [skipExisting] = useState(true);
-    const [timeout] = useState(300);
+    const skipExisting = true;
+    const timeout = 300;
     const [showPersonalize, setShowPersonalize] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
 
-    // Load colors from localStorage on component mount
-    const [colors, setColors] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const savedColors = localStorage.getItem('waveColors_v2');
-            return savedColors
-                ? JSON.parse(savedColors)
-                : { lineColor: '#50C878', backgroundColor: '#000000' };
-        }
-        return { lineColor: '#50C878', backgroundColor: '#000000' };
-    });
+    // Server and client must render the same first paint: reading
+    // localStorage in a useState initializer caused a hydration mismatch
+    // ("This won't be patched up"), which froze tab/color updates. Defaults
+    // are rendered, the saved values are applied after mount instead.
+    const DEFAULT_COLORS = { lineColor: '#50C878', backgroundColor: '#000000' };
+    const [colors, setColors] = useState(DEFAULT_COLORS);
+    const colorsLoaded = useRef(false);
 
-    // Save colors to localStorage whenever they change
+    // Apply saved colors once, right after hydration.
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        try {
+            const savedColors = localStorage.getItem('waveColors_v2');
+            if (savedColors) {
+                const parsed = JSON.parse(savedColors) as { lineColor?: unknown; backgroundColor?: unknown };
+                if (parsed && typeof parsed.lineColor === 'string') {
+                    setColors({
+                        lineColor: parsed.lineColor,
+                        backgroundColor: typeof parsed.backgroundColor === 'string' ? parsed.backgroundColor : '#000000'
+                    });
+                }
+            }
+        } catch {
+            // keep defaults
+        } finally {
+            colorsLoaded.current = true;
+        }
+    }, []);
+
+    // Save colors to localStorage whenever they change (after the load above).
+    useEffect(() => {
+        if (!colorsLoaded.current) return;
+        try {
             localStorage.setItem('waveColors_v2', JSON.stringify(colors));
+        } catch {
+            // session-only
         }
     }, [colors]);
 
-    const [progress, setProgress] = useState<DownloadProgress>({
-        percentage: 0,
-        downloaded: 0,
-        total: 0,
-        speed: 0,
-        speed_str: '0 B/s',
-        eta: 0,
-        status: 'ready',
-        message: '',
-        _percent_str: '0%',
-        _speed_str: '0 B/s',
-        _eta_str: '--:--',
-        downloaded_bytes: 0,
-        total_bytes: 0,
-        currentItem: 0,
-        totalItems: 0,
-        currentFile: '',
-        isPlaylist: false,
-        filename: '',
-        speed_raw: 0,
-        timestamp: Date.now()
-    });
+    const [progress, setProgress] = useState<DownloadProgress>(defaultProgress());
 
     const [processPlaylist, setProcessPlaylist] = useState(false);
     const [isPlaylist, setIsPlaylist] = useState(false);
+    const [tab, setTab] = useState<'download' | 'library'>('download');
+    // Restore the last tab after hydration (deterministic first paint).
+    useEffect(() => {
+        try {
+            if (localStorage.getItem('audit-tab') === 'library') setTab('library');
+        } catch {
+            // keep download
+        }
+    }, []);
+    // Seamless download -> library: set on success, consumed by PlayerSection
+    // (auto-scan + queue of fresh files, optional autoplay).
+    const [harvest, setHarvest] = useState<{ since: number; autoplay: boolean } | null>(null);
+    const clearHarvest = useCallback(() => setHarvest(null), []);
+    const switchTab = (t: 'download' | 'library') => {
+        setTab(t);
+        try {
+            localStorage.setItem('audit-tab', t);
+        } catch {
+            // session-only
+        }
+    };
+    const [isMini, setIsMini] = useState(false);
+
+    // Floating mini-player window shows ONLY the player: the mini loader
+    // navigates here with #mini (instant), IPC 'mini:mode' is the fallback.
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            if (window.location.hash === '#mini') {
+                setIsMini(true);
+                return;
+            }
+            if (window.electronAPI?.onMiniMode) {
+                window.electronAPI.onMiniMode(() => setIsMini(true));
+            }
+        }
+    }, []);
+
+    // Esc closes the style popover (Info handles its own Esc).
+    useEffect(() => {
+        if (!showPersonalize) return;
+        const close = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setShowPersonalize(false);
+        };
+        document.addEventListener('keydown', close);
+        return () => document.removeEventListener('keydown', close);
+    }, [showPersonalize]);
 
     // File input refs
     const csvInputRef = useRef<HTMLInputElement>(null);
@@ -82,29 +162,7 @@ export default function Home() {
     useEffect(() => {
         if (progress.status === 'finished' || progress.status === 'error') {
             const timer = setTimeout(() => {
-                // Reset progress state
-                setProgress({
-                    percentage: 0,
-                    downloaded: 0,
-                    total: 0,
-                    speed: 0,
-                    speed_str: '0 B/s',
-                    eta: 0,
-                    status: 'ready',
-                    message: '',
-                    _percent_str: '0%',
-                    _speed_str: '0 B/s',
-                    _eta_str: '--:--',
-                    downloaded_bytes: 0,
-                    total_bytes: 0,
-                    currentItem: 0,
-                    totalItems: 0,
-                    currentFile: '',
-                    isPlaylist: false,
-                    filename: '',
-                    speed_raw: 0,
-                    timestamp: Date.now()
-                });
+                setProgress(defaultProgress());
 
                 // Reset form state
                 setUrl('');
@@ -249,16 +307,6 @@ export default function Home() {
         }
     }, [url]);
 
-    // Helper: check if URL has playlist parameters
-    function hasPlaylistParams(str: string): boolean {
-        try {
-            const urlObj = new URL(str);
-            return urlObj.searchParams.has('list') || urlObj.pathname.includes('/playlist');
-        } catch {
-            return false;
-        }
-    }
-
     const handleSelectFolder = async () => {
         try {
             // Check if we're running in Electron
@@ -292,28 +340,8 @@ export default function Home() {
         setLoading(true);
         setResult(null);
         setError(null);
-        setProgress({
-            percentage: 0,
-            downloaded: 0,
-            total: 0,
-            speed: 0,
-            speed_str: '0 B/s',
-            eta: 0,
-            status: 'downloading',
-            message: 'Starting batch download...',
-            _percent_str: '0%',
-            _speed_str: '0 B/s',
-            _eta_str: '--:--',
-            downloaded_bytes: 0,
-            total_bytes: 0,
-            currentItem: 0,
-            totalItems: 0,
-            currentFile: '',
-            isPlaylist: false,
-            filename: '',
-            speed_raw: 0,
-            timestamp: Date.now()
-        });
+        setProgress(defaultProgress({ status: 'downloading', message: 'Starting batch download...' }));
+        const batchStartedAt = Date.now();
 
         try {
             const text = await file.text();
@@ -378,6 +406,7 @@ export default function Home() {
 
             if (!isCancelled.current) {
                 setResult(`Batch completed. Success: ${successCount}, Failed: ${failCount}`);
+                if (successCount > 0) setHarvest({ since: batchStartedAt, autoplay: false });
                 setProgress(prev => ({
                     ...prev,
                     status: 'finished',
@@ -414,29 +443,8 @@ export default function Home() {
         setError(null);
         setResult(null);
 
-        // Reset progress to show loading state
-        setProgress({
-            percentage: 0,
-            downloaded: 0,
-            total: 0,
-            speed: 0,
-            speed_str: '0 B/s',
-            eta: 0,
-            status: 'downloading',
-            message: 'Initializing download...',
-            _percent_str: '0%',
-            _speed_str: '0 B/s',
-            _eta_str: '--:--',
-            downloaded_bytes: 0,
-            total_bytes: 0,
-            currentItem: 0,
-            totalItems: 0,
-            currentFile: '',
-            isPlaylist: false,
-            filename: '',
-            speed_raw: 0,
-            timestamp: Date.now()
-        });
+        setProgress(defaultProgress({ status: 'downloading', message: 'Initializing download...' }));
+        const downloadStartedAt = Date.now();
 
         try {
             // Prepare the query string
@@ -483,6 +491,7 @@ export default function Home() {
                 if (result.success) {
                     const savedPath = result.outputPath || result.message || outputFolder;
                     setResult(`Downloaded successfully to: ${savedPath}`);
+                    setHarvest({ since: downloadStartedAt, autoplay: false });
                     setProgress(prev => ({ ...prev, status: 'finished', percentage: 100 }));
                 } else {
                     setError(result.error || 'Failed to download');
@@ -503,52 +512,47 @@ export default function Home() {
     };
 
     return (
-        <main className="relative min-h-screen overflow-hidden">
+        <main
+            className="relative h-screen overflow-hidden"
+            style={{ '--audit-accent': colors.lineColor } as React.CSSProperties}
+        >
+            {isMini ? (
+                <MiniView />
+            ) : (
+            <>
             <Background
                 lineColor={colors.lineColor}
                 backgroundColor={colors.backgroundColor}
+                className="rounded-xl"
             />
 
             {/* Draggable Header with Native Window Controls */}
             <div
-                className="absolute top-2 left-2 right-2 h-10 flex items-center justify-between px-3 bg-black/30 z-50 backdrop-blur-md rounded-xl shadow-lg shadow-black/20"
+                className="absolute top-2 left-2 right-2 h-10 flex items-center justify-between px-3 glass-base z-50 rounded-xl"
                 style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             >
 
-                {/* App Controls - Left Side */}
+                {/* App Controls - Left Side (global: style + info popovers) */}
                 <div style={{ WebkitAppRegion: 'no-drag' }} className="flex items-center space-x-2 group">
                     <button
                         onClick={() => {
-                            setShowAdvanced(!showAdvanced);
-                            if (showPersonalize) setShowPersonalize(false);
-                            if (showInfo) setShowInfo(false);
-                        }}
-                        className={`p-1.5 rounded-lg transition-colors hover:text-emerald-500 ${showAdvanced ? 'bg-white/10 text-emerald-500' : 'hover:bg-white/5'}`}
-                        title="Advanced Options"
-                    >
-                        <Settings className="w-5 h-5 text-gray-300 hover:text-emerald-500 transition-colors" />
-                    </button>
-                    <button
-                        onClick={() => {
                             setShowPersonalize(!showPersonalize);
-                            if (showAdvanced) setShowAdvanced(false);
                             if (showInfo) setShowInfo(false);
                         }}
-                        className={`p-1.5 rounded-lg transition-colors hover:text-emerald-500 ${showPersonalize ? 'bg-white/10 text-emerald-500' : 'hover:bg-white/5'}`}
+                        className={`p-1.5 rounded-lg transition-colors acc-hover-text ${showPersonalize ? 'bg-white/10 acc-text' : 'hover:bg-white/5'}`}
                         title="Personalize"
                     >
-                        <Palette className="w-5 h-5 text-gray-300 hover:text-emerald-500 transition-colors" />
+                        <Palette className="w-5 h-5 text-gray-300 acc-hover-text transition-colors" />
                     </button>
                     <button
                         onClick={() => {
                             setShowInfo(true);
-                            if (showAdvanced) setShowAdvanced(false);
                             if (showPersonalize) setShowPersonalize(false);
                         }}
-                        className={`p-1.5 rounded-lg transition-colors hover:text-emerald-500 ${showInfo ? 'bg-white/10 text-emerald-500' : 'hover:bg-white/5'}`}
+                        className={`p-1.5 rounded-lg transition-colors acc-hover-text ${showInfo ? 'bg-white/10 acc-text' : 'hover:bg-white/5'}`}
                         title="Info"
                     >
-                        <InfoIcon className="w-5 h-5 text-gray-300 hover:text-emerald-500 transition-colors" />
+                        <InfoIcon className="w-5 h-5 text-gray-300 acc-hover-text transition-colors" />
                     </button>
                 </div>
 
@@ -556,21 +560,21 @@ export default function Home() {
                 <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} className="flex items-center space-x-4">
                     <button
                         onClick={() => window.electronAPI?.windowMinimize?.()}
-                        className="p-1 text-gray-300 hover:text-emerald-500 transition-colors"
+                        className="p-1 text-gray-300 acc-hover-text transition-colors"
                         title="Minimize"
                     >
                         <Minus className="w-4 h-4" />
                     </button>
                     <button
                         onClick={() => window.electronAPI?.windowMaximize?.()}
-                        className="p-1 text-gray-300 hover:text-emerald-500 transition-colors"
+                        className="p-1 text-gray-300 acc-hover-text transition-colors"
                         title="Maximize"
                     >
                         <Square className="w-3.5 h-3.5" />
                     </button>
                     <button
                         onClick={() => window.electronAPI?.windowClose?.()}
-                        className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                        className="p-1 text-gray-300 acc-hover-text transition-colors"
                         title="Close"
                     >
                         <X className="w-4 h-4" />
@@ -578,9 +582,59 @@ export default function Home() {
                 </div>
             </div>
 
-            <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 pt-16">
-                <div className="w-full max-w-3xl bg-black/30 backdrop-blur-md rounded-2xl p-4 sm:p-6 md:p-8 shadow-2xl border border-gray-800/50 mx-2 sm:mx-4">
-                    <div className="space-y-4 w-full">
+            {/* Global title-bar popovers: style + info live here, not inside tabs */}
+            {(showPersonalize || showInfo) && (
+                <div
+                    className="absolute top-14 left-2 z-50 w-[320px] max-w-[calc(100vw-1rem)] max-h-[calc(100vh-5rem)] overflow-y-auto rounded-2xl glass-popover p-3 flex flex-col gap-3"
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                >
+                    {showPersonalize && (
+                        <Personalize
+                            show
+                            onColorChange={(type, value) => {
+                                setColors((prev: { lineColor: string; backgroundColor: string }) => ({
+                                    ...prev,
+                                    [type]: value
+                                }));
+                            }}
+                            currentColors={colors}
+                        />
+                    )}
+                    {showInfo && (
+                        <Info
+                            show
+                            onClose={() => setShowInfo(false)}
+                        />
+                    )}
+                </div>
+            )}
+
+            <div className="relative z-10 h-screen overflow-y-auto">
+            <div className="flex flex-col items-center justify-center min-h-full p-4 pt-16">
+                <div className="w-full max-w-3xl glass-base rounded-2xl p-4 sm:p-6 md:p-8 mx-2 sm:mx-4">
+                    {/* Two distinct sections: Downloader vs Library & Player */}
+                    <div className="grid grid-cols-2 gap-2 mb-5">
+                        <button onClick={() => switchTab('download')}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors ${tab === 'download' ? 'acc-soft-20 border acc-border' : 'glass-inset'}`}>
+                            <ArrowDownToLine className={`w-5 h-5 shrink-0 ${tab === 'download' ? 'acc-text' : 'text-gray-500'}`} />
+                            <span className="min-w-0">
+                                <span className={`block text-xs sm:text-sm font-semibold ${tab === 'download' ? 'text-white' : 'text-gray-300'}`}>Downloader</span>
+                                <span className="block text-[10px] sm:text-[11px] text-gray-500 truncate">YouTube → audio files</span>
+                            </span>
+                        </button>
+                        <button onClick={() => switchTab('library')}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors ${tab === 'library' ? 'acc-soft-20 border acc-border' : 'glass-inset'}`}>
+                            <ListMusic className={`w-5 h-5 shrink-0 ${tab === 'library' ? 'acc-text' : 'text-gray-500'}`} />
+                            <span className="min-w-0">
+                                <span className={`block text-xs sm:text-sm font-semibold ${tab === 'library' ? 'text-white' : 'text-gray-300'}`}>Library & Player</span>
+                                <span className="block text-[10px] sm:text-[11px] text-gray-500 truncate">Your music, EQ, playlists</span>
+                            </span>
+                        </button>
+                    </div>
+                    <div className="space-y-5 w-full">
+                        {/* Both sections stay mounted (hidden toggle): download input survives tab
+                            switches, and the player keeps publishing state to the mini player. */}
+                        <div className={tab === 'download' ? 'flex flex-col gap-5' : 'hidden'}>
                         <div className="flex gap-2 w-full">
                             <div className="flex-1">
                                 <input
@@ -588,12 +642,12 @@ export default function Home() {
                                     placeholder="Paste YouTube link or 'Artist - Song Name'..."
                                     value={url}
                                     onChange={e => setUrl(e.target.value)}
-                                    className="w-full px-4 py-3 sm:px-5 sm:py-4 text-sm sm:text-base bg-black/30 backdrop-blur-sm border border-gray-800/50 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none text-gray-100 placeholder-gray-400 transition-all duration-200"
+                                    className="glass-inset w-full px-4 py-3 sm:px-5 sm:py-4 text-sm sm:text-base rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none text-gray-100 placeholder-gray-400 transition-all duration-200"
                                     disabled={loading}
                                 />
                             </div>
                             {isPlaylist && (
-                                <div className="flex items-center bg-purple-600/30 rounded-xl px-4 border border-purple-500/30">
+                                <div className="glass-inset flex items-center rounded-xl px-4">
                                     <input
                                         type="checkbox"
                                         id="processPlaylist"
@@ -611,17 +665,17 @@ export default function Home() {
                         <div className="flex flex-col sm:flex-row gap-3">
                             <button
                                 onClick={handleSelectFolder}
-                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-black/30 hover:bg-black backdrop-blur-sm border border-gray-800/50 rounded-xl text-gray-200 hover:text-emerald-400 transition-colors duration-200 font-medium text-xs sm:text-sm"
+                                className="glass-inset glass-hover flex-1 flex items-center justify-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl text-gray-200 acc-hover-text transition-colors duration-200 font-medium text-xs sm:text-sm"
                             >
                                 <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5" />
                                 <span className="truncate">{outputFolder ? `Output: ${outputFolder.split('\\').pop()?.split('/').pop() || 'Selected'}` : "Choose Folder"}</span>
                             </button>
                             <button
                                 onClick={() => csvInputRef.current?.click()}
-                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-emerald-600/30 hover:bg-emerald-600/50 border border-green-500/50 rounded-xl text-blue-200 hover:text-white transition-colors duration-200 font-medium text-xs sm:text-sm"
+                                className="glass-inset glass-hover flex-1 flex items-center justify-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl text-gray-200 acc-hover-text transition-colors duration-200 font-medium text-xs sm:text-sm"
                                 disabled={loading}
                             >
-                                <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5 acc-text" />
                                 <span className="hidden xs:inline">Import from</span> CSV
                                 <input
                                     ref={csvInputRef}
@@ -635,10 +689,10 @@ export default function Home() {
                             </button>
                             <button
                                 onClick={() => txtInputRef.current?.click()}
-                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 rounded-xl text-green-200 hover:text-white transition-colors duration-200 font-medium text-xs sm:text-sm"
+                                className="glass-inset glass-hover flex-1 flex items-center justify-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl text-gray-200 acc-hover-text transition-colors duration-200 font-medium text-xs sm:text-sm"
                                 disabled={loading}
                             >
-                                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <FileText className="w-4 h-4 sm:w-5 sm:h-5 acc-text" />
                                 <span className="hidden xs:inline">Import from</span> TXT
                                 <input
                                     ref={txtInputRef}
@@ -672,7 +726,28 @@ export default function Home() {
                         />
 
 
-                        {/* Advanced Options */}
+                        {/* Advanced Options (downloader-scoped gear) */}
+                        <button
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            className={`glass ${showAdvanced ? 'glass-active' : 'glass-hover'} flex items-center justify-between w-full px-4 py-2.5 rounded-full text-left transition-all duration-200 group`}
+                            title="Advanced Options"
+                            aria-expanded={showAdvanced}
+                        >
+                            <span className="flex items-center gap-2.5 min-w-0">
+                                <span className={`flex items-center justify-center w-6 h-6 shrink-0 rounded-full border transition-colors duration-200 ${showAdvanced ? 'acc-soft-20 acc-border acc-text' : 'bg-white/5 border-white/10 text-gray-300 acc-group-hover-text'}`}>
+                                    <Settings className="w-3.5 h-3.5 transition-colors" />
+                                </span>
+                                <span className={`text-[11px] font-medium uppercase tracking-widest transition-colors duration-200 ${showAdvanced ? 'text-gray-100' : 'text-gray-400 group-hover:text-gray-200'}`}>
+                                    Download options
+                                </span>
+                            </span>
+                            <svg
+                                className={`w-3.5 h-3.5 shrink-0 text-gray-400 acc-group-hover-text transition-transform duration-300 ${showAdvanced ? 'rotate-180' : ''}`}
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
                         <AdvancedOptions
                             show={showAdvanced}
                             format={format}
@@ -693,32 +768,36 @@ export default function Home() {
                             setFps={setFps}
                         />
 
-                        <Personalize
-                            show={showPersonalize}
-                            onColorChange={(type, value) => {
-                                setColors((prev: { lineColor: string; backgroundColor: string }) => ({
-                                    ...prev,
-                                    [type]: value
-                                }));
-                            }}
-                            currentColors={colors}
-                        />
-                        <Info
-                            show={showInfo}
-                            onClose={() => setShowInfo(false)}
-                        />
-
                         {/* Progress Bar - Always show if there's any progress data */}
-                        <div className="w-full mt-6">
+                        <div className="w-full">
                             <DownloadProgressComponent progress={progress} />
                         </div>
 
                         {/* Results and Errors */}
                         <StatusMessage result={result || ''} error={error || ''} />
+                        {result && harvest && (
+                            <div className="flex gap-2">
+                                <button onClick={() => switchTab('library')}
+                                    className="glass-inset glass-hover flex-1 px-3 py-2.5 text-xs sm:text-sm font-medium rounded-xl text-gray-200 acc-hover-text transition-colors">
+                                    Open in Library
+                                </button>
+                                <button onClick={() => { setHarvest((h) => (h ? { ...h, autoplay: true } : h)); switchTab('library'); }}
+                                    className="flex-1 px-3 py-2.5 text-xs sm:text-sm font-medium acc-soft-40 acc-hover-60 border acc-border rounded-xl text-white transition-colors">
+                                    Play now
+                                </button>
+                            </div>
+                        )}
+                        </div>
+                        <div className={tab === 'library' ? 'flex flex-col gap-5' : 'hidden'}>
+                        <PlayerSection outputFolder={outputFolder} lineColor={colors.lineColor} harvest={harvest} onHarvestDone={clearHarvest} />
+                        </div>
                         <Footer />
                     </div>
                 </div>
             </div>
+            </div>
+            </>
+            )}
         </main>
     );
 }

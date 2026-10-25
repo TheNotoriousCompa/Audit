@@ -4,9 +4,16 @@ import isDev from 'electron-is-dev';
 const isSquirrelShim = Boolean(require('electron-squirrel-startup'));
 
 import { logToFile, setupCrashHandler } from './logger';
-import { initRenderer, createWindow } from './window';
+import { initRenderer, createWindow, loadMainContent, getPreloadPath, getIconPath } from './window';
 import { registerIPCHandlers } from './ipc-handlers';
 import { initAutoUpdater } from './auto-updater';
+import { registerMediaProtocolScheme, handleMediaProtocol } from './media-protocol';
+import {
+  registerMiniIpc, setupCloseToMini, setMiniLoader, setMiniPreload, armQuitBypass,
+} from './mini-player';
+import { setupTray, showMiniHint } from './tray';
+
+registerMediaProtocolScheme();
 
 setupCrashHandler();
 logToFile(`--- App Booting (argv: ${process.argv.join(' ')}) ---`);
@@ -19,8 +26,18 @@ if (isSquirrelShim) {
   logToFile(`--- App Starting (isDev: ${isDev}) ---`);
 
   app.whenReady().then(() => {
-    createWindow();
+    handleMediaProtocol();
+    registerMiniIpc();
+    setMiniPreload(getPreloadPath());
+    setMiniLoader((mini) => loadMainContent(mini, true));
+    const win = createWindow();
+    setupCloseToMini(win, () => showMiniHint());
     registerIPCHandlers();
+    setupTray(getIconPath(), () => {
+      armQuitBypass();
+      app.quit();
+    });
+    app.on('before-quit', () => armQuitBypass());
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
