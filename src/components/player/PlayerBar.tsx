@@ -157,7 +157,7 @@ export default function PlayerBar({ queue, queueIndex, onAdvance, onAudioReady, 
   }, [playing, onPlayingChange]);
 
   return (
-    <div className="w-full glass-inset rounded-xl px-3 py-2 sm:px-4 sm:py-3">
+    <div className="w-full glass-inset rounded-xl px-3 py-2">
       <audio
         ref={audioRef}
         onEnded={handleEnded}
@@ -167,7 +167,7 @@ export default function PlayerBar({ queue, queueIndex, onAdvance, onAudioReady, 
         onPause={() => setPlaying(false)}
         preload="auto"
       />
-      <div className="text-xs sm:text-sm text-gray-200 truncate mb-1">
+      <div className="text-[11px] sm:text-xs text-gray-200 truncate mb-1">
         {current ? (
           <span><span className="acc-text font-medium">{current.artist || 'Unknown artist'}</span>
             {' — '}{current.title}</span>

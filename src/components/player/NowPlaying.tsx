@@ -24,9 +24,9 @@ export default function NowPlaying({
   const art = useArt(track?.path);
 
   return (
-    <div className="w-full glass-inset rounded-xl p-2.5 sm:p-3">
-      <div className="flex gap-2.5">
-        <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-lg overflow-hidden bg-black/50 border border-gray-800/50 flex items-center justify-center">
+    <div className="w-full glass-inset rounded-xl p-2.5">
+      <div className="flex items-center gap-2.5">
+        <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 rounded-lg overflow-hidden bg-black/50 border border-white/10 flex items-center justify-center">
           {art ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={art} alt="Album art" className="w-full h-full object-cover" />
@@ -34,40 +34,43 @@ export default function NowPlaying({
             <DiskPlaceholder className="w-full h-full" spinning={playing} />
           )}
         </div>
+
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] text-gray-500 tabular-nums">{queuePosition}</div>
-          <div className="text-sm sm:text-base font-semibold text-gray-100 truncate">
+          <div className="text-[10px] text-gray-500 tabular-nums">{queuePosition || '—'}</div>
+          <div className="text-sm font-semibold text-gray-100 truncate">
             {track?.title || 'Nothing playing'}
           </div>
-          <div className="text-xs acc-text truncate">{track?.artist || '—'}</div>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex items-center gap-0.5" title="Rating">
-              {[1, 2, 3, 4, 5].map((s) => (
-                <button key={s} onClick={() => track && onRate(rating === s ? 0 : s)}
-                  className="p-0.5 transition-colors" title={`${s} star${s > 1 ? 's' : ''}`}>
-                  <Star className={`w-3.5 h-3.5 ${s <= rating ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`} />
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-0.5">
-              <button onClick={onPrev} title="Previous" disabled={!track}
-                className="p-1.5 rounded-lg text-gray-300 acc-hover-text transition-colors disabled:opacity-30">
-                <SkipBack className="w-4 h-4" />
+          <div className="text-[11px] acc-text truncate">{track?.artist || '—'}</div>
+        </div>
+
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <div className="flex items-center gap-0.5" title="Rating">
+            {[1, 2, 3, 4, 5].map((s) => (
+              <button key={s} onClick={() => track && onRate(rating === s ? 0 : s)}
+                className="p-0.5 transition-colors" title={`${s} star${s > 1 ? 's' : ''}`}>
+                <Star className={`w-3 h-3 ${s <= rating ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`} />
               </button>
-              <button onClick={onToggle} title={playing ? 'Pause' : 'Play'} disabled={!track}
-                className="p-1.5 rounded-full acc-soft-40 acc-hover-60 border acc-border text-white transition-colors disabled:opacity-30">
-                {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </button>
-              <button onClick={onNext} title="Next" disabled={!track}
-                className="p-1.5 rounded-lg text-gray-300 acc-hover-text transition-colors disabled:opacity-30">
-                <SkipForward className="w-4 h-4" />
-              </button>
-            </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-0.5">
+            <button onClick={onPrev} title="Previous" disabled={!track}
+              className="p-1 rounded-lg text-gray-300 acc-hover-text transition-colors disabled:opacity-30">
+              <SkipBack className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={onToggle} title={playing ? 'Pause' : 'Play'} disabled={!track}
+              className="p-1.5 rounded-full acc-soft-40 acc-hover-60 border acc-border text-white transition-colors disabled:opacity-30">
+              {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            </button>
+            <button onClick={onNext} title="Next" disabled={!track}
+              className="p-1 rounded-lg text-gray-300 acc-hover-text transition-colors disabled:opacity-30">
+              <SkipForward className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
+
       <div className="mt-2">
-        <Visualizer lineColor={lineColor} height={44} />
+        <Visualizer lineColor={lineColor} height={36} />
       </div>
     </div>
   );

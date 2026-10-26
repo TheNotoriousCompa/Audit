@@ -6,8 +6,14 @@ import type { DownloadProgress, DownloadOptions, ElectronAPI, LibraryScanResult,
 // Log che preload script è caricato
 console.log('Preload script loaded');
 
+// The mini window is tagged at creation time via additionalArguments, so the
+// renderer knows what to display immediately (the old #mini hash + IPC signal
+// only worked in dev and raced with React mounting in packaged builds).
+const isMiniWindow = process.argv.includes('--audit-mini');
+
 // Implementazione dell'API
 const electronAPI: ElectronAPI = {
+  isMiniWindow,
   windowMinimize: () => {
     console.log('windowMinimize called');
     ipcRenderer.send('window:minimize');
@@ -74,6 +80,15 @@ const electronAPI: ElectronAPI = {
   },
   closeMini: (): void => {
     ipcRenderer.send('mini:close');
+  },
+  toggleMini: (): void => {
+    ipcRenderer.send('mini:toggle');
+  },
+  queryMini: (): void => {
+    ipcRenderer.send('mini:query');
+  },
+  onMiniState: (cb: (open: boolean) => void): void => {
+    ipcRenderer.on('mini:state', (_event, state: { open?: boolean }) => cb(Boolean(state?.open)));
   },
   onMiniMode: (cb: () => void): void => {
     ipcRenderer.once('mini:mode', () => cb());

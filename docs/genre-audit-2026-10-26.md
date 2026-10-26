@@ -1,0 +1,158 @@
+# Genre audit — 2026-10-26
+
+Library: `C:\Users\win7\Desktop\Music`
+
+## Coverage
+
+| Metric | Value |
+|---|---|
+| Tracks | 1394 |
+| Guessed | 1076 |
+| Coverage | 77.2% |
+
+## Sources
+
+| Source | Tracks |
+|---|---|
+| artist_seed | 488 |
+| folder | 373 |
+| none | 318 |
+| tag | 177 |
+| filename | 38 |
+
+## Rules fired (top 25)
+
+| Rule | Tracks |
+|---|---|
+| `folder:Clair Obscur_ Expedition 33 (Original So` | 174 |
+| `tag:Soundtrack` | 119 |
+| `folder:Elden Ring OST Full Official Soundtrack` | 67 |
+| `tag:Score` | 58 |
+| `seed:caparezza` | 55 |
+| `folder:NieR_Automata Original Soundtrack【Audio】` | 46 |
+| `folder:NieR Gestalt & Replicant Original Soundt` | 43 |
+| `filename` | 38 |
+| `folder:Dark Souls 3 (Original Game Soundtrack)` | 32 |
+| `seed:motoi sakuraba` | 31 |
+| `seed:eminem` | 25 |
+| `seed:logic` | 25 |
+| `seed:yuka kitamura yuka` | 22 |
+| `seed:freddie dredd` | 21 |
+| `seed:yuka kitamura` | 18 |
+| `seed:toby fox` | 17 |
+| `seed:kanye west` | 15 |
+| `seed:omori` | 15 |
+| `seed:travis scott` | 14 |
+| `seed:moxifloxi` | 12 |
+| `seed:nas` | 10 |
+| `seed:denzel curry` | 9 |
+| `seed:square enix music` | 9 |
+| `seed:calcutta` | 8 |
+| `seed:don toliver` | 8 |
+
+## Genres
+
+| Genre | Tracks |
+|---|---|
+| Soundtrack | 703 |
+| Hip Hop | 220 |
+| Rap | 55 |
+| Rock | 27 |
+| Pop | 14 |
+| Electronic | 12 |
+| Folk | 7 |
+| House | 6 |
+| World | 5 |
+| Metal | 5 |
+| Reggae | 4 |
+| Drum & Bass | 3 |
+| Jazz | 3 |
+| Classical | 3 |
+| Techno | 3 |
+| Latin | 2 |
+| Dubstep | 2 |
+| Punk | 1 |
+| Soul & Funk | 1 |
+
+## Confidence buckets
+
+| Bucket | Tracks |
+|---|---|
+| 0.90+ | 665 |
+| 0.60-0.74 | 373 |
+| <0.60 | 38 |
+
+## Unknown — top artists
+
+| Artist | Tracks |
+|---|---|
+| (none) | 4 |
+| plenka | 4 |
+| Super Guitar Bros | 4 |
+| EdgeCrusher420 | 3 |
+| DM DOKURO | 3 |
+| Jan J. Močnik | 3 |
+| Merio | 3 |
+| Miguel Angeles | 3 |
+| Mike Klubnika | 3 |
+| Nightcore | 3 |
+| TapDaddy | 3 |
+| 99zed, Saliva Grey | 2 |
+| C418 | 2 |
+| chiello | 2 |
+| Coda | 2 |
+| DJ GUDOG | 2 |
+| DM DOKURO, SixteenInMono | 2 |
+| Dope D.O.D. | 2 |
+| DR. GABBA | 2 |
+| Dxrk ダーク | 2 |
+| El Tigr3 | 2 |
+| Fabri Fibra | 2 |
+| Frah Quintale | 2 |
+| Frank Ocean | 2 |
+| HVDES | 2 |
+
+## Unknown — top folders
+
+| Folder | Tracks |
+|---|---|
+| Brani preferiti (pre fix) | 300 |
+| Music | 10 |
+| App Electron | 5 |
+| Piano Collections Nier Gestalt & Replicant | 2 |
+| Piano | 1 |
+
+## Tag vs artist-majority conflicts (0)
+
+| Artist | Tag | Majority | Votes |
+|---|---|---|---|
+
+## Folder-sourced sample (manual precision check)
+
+| Genre | Rule | Path |
+|---|---|---|
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur Expedition 33 (Original Soundtrack) 115 - Atelier de Clea - Contre le Coeur.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur Expedition 33 (Original Soundtrack) 124 - The Reacher - Orphelin.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur Expedition 33 (Original Soundtrack) 15 - Spring Meadows - Get Up! For Lumière!.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur Expedition 33 (Original Soundtrack) 27 - Flying Waters - Submerged Lights.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur Expedition 33 (Original Soundtrack) 40 - Gestral Village - Gestral Market.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) - 139 - Lumière's Opera - Continuer à t'aimer.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 01 - Alicia.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 02 - Gustave.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 03 - Lumière.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 04 - Lumière à L'Aube.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 05 - Promenade dans Lumière.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 06 - Le Grand Café de Lumière.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 07 - Continuer à t'aimer (Lune).mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 08 - Rêveries dans Lumière.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 09 - Nocturne pour Lumière (Violoncelle).mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 10 - The Departure.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 100 - Sirène - Robe de Jour.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 101 - Sirène - Robe de Nuit.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 102 - Sirène - Tisser la Beauté.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 103 - Sirène - Rouge d'Iris.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 104 - Sirène - Poème d'Amour.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 105 - Nocturne pour un Masque de Joie.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 106 - Nocturne pour un Masque de Tristesse.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 107 - Nocturne pour un Masque de Colère.mp3` |
+| Soundtrack | `folder:Clair Obscur_ Expedition 33 (Original So` | `C:\Users\win7\Desktop\Music\App Electron\Clair Obscur_ Expedition 33 (Original Soundtrack)\Clair Obscur_ Expedition 33 (Original Soundtrack) 108 - Aria pour un Masque de Colère.mp3` |

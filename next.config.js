@@ -4,7 +4,10 @@ import webpack from "webpack";
 const nextConfig = {
   reactStrictMode: false,
   output: "export",
-  distDir: "dist/renderer",
+  // Production: dist/renderer is what electron-serve loads from the asar.
+  // Dev: keep it in .next so `next dev` never overwrites the packaged
+  // renderer (that used to break dev CSS after a build).
+  distDir: process.env.NODE_ENV === "development" ? ".next" : "dist/renderer",
   images: { unoptimized: true },
   // trailingSlash: true, // Disabilitato per evitare problemi con i percorsi relativi in Electron
   assetPrefix: "./",

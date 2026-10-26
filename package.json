@@ -22,7 +22,7 @@
     "clean": "rimraf dist",
     "clean:out": "rimraf out",
     "clean:all": "rimraf dist out .next",
-    "postbuild": "node -e \"const fs = require('fs'); fs.mkdirSync('dist/preload', { recursive: true }); fs.writeFileSync('dist/preload/package.json', JSON.stringify({ type: 'commonjs' })); fs.mkdirSync('dist/main', { recursive: true }); fs.writeFileSync('dist/main/package.json', JSON.stringify({ type: 'commonjs' }));\"",
+    "postbuild": "node -e \"const fs = require('fs'); fs.mkdirSync('dist/preload', { recursive: true }); fs.writeFileSync('dist/preload/package.json', JSON.stringify({ type: 'commonjs' })); fs.mkdirSync('dist/main', { recursive: true }); fs.writeFileSync('dist/main/package.json', JSON.stringify({ type: 'commonjs' }));\" && node scripts/postbuild-css.js",
     "dev": "concurrently \"npm run dev:renderer\" \"wait-on http://localhost:3000 && npm run dev:electron\"",
     "start": "electron-forge start",
     "setup:python": "node setup-python.js",
@@ -41,6 +41,9 @@
     "electron-squirrel-startup": "^1.0.1",
     "update-electron-app": "^3.2.0"
   },
+  "browserslist": [
+    "Chrome >= 120"
+  ],
   "devDependencies": {
     "@electron-forge/cli": "^7.10.2",
     "@electron-forge/maker-deb": "^7.10.2",

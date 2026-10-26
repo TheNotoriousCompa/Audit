@@ -81,6 +81,11 @@ export interface Track {
   duration: number;
   has_art: boolean;
   lrc: boolean;
+  /** Canonical genre inferred by the smart pass (tag/album/artist/folder). */
+  genre_guess?: string;
+  genre_confidence?: number;
+  genre_source?: 'tag' | 'album' | 'artist' | 'folder' | 'filename' | 'artist_seed' | '';
+  genre_rule?: string;
 }
 
 export interface LibraryScanResult {
@@ -136,6 +141,8 @@ export interface PlayerMiniState {
 
 // Types for the Electron API
 export interface ElectronAPI {
+  /** True inside the floating mini-player window (set by the preload). */
+  isMiniWindow: boolean;
   // Window control functions
   windowMinimize: () => void;
   windowMaximize: () => void;
@@ -162,6 +169,9 @@ export interface ElectronAPI {
   miniControl: (cmd: MiniCommand) => void;
   expandApp: () => void;
   closeMini: () => void;
+  toggleMini: () => void;
+  queryMini: () => void;
+  onMiniState: (cb: (open: boolean) => void) => void;
   onMiniMode: (cb: () => void) => void;
 }
 

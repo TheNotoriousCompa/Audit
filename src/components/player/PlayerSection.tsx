@@ -407,12 +407,12 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
   ];
 
   return (
-    <div className="space-y-2.5 w-full">
-      <div className="grid grid-cols-5 gap-1 bg-black/30 border border-gray-800/50 rounded-xl p-1">
+    <div className="space-y-2 w-full">
+      <div className="grid grid-cols-5 gap-1 rounded-xl bg-black/25 border border-white/5 p-1">
         {nav.map(({ id, label, Icon }) => (
           <button key={id} onClick={() => setView(id)}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${view === id ? 'acc-soft-40 text-white' : 'text-gray-400 acc-hover-text'}`}>
-            <Icon className="w-4 h-4" />
+            className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 py-1 rounded-lg text-[10px] sm:text-[11px] font-medium transition-colors ${view === id ? 'acc-soft-20 acc-text' : 'text-gray-400 acc-hover-text'}`}>
+            <Icon className="w-3.5 h-3.5" />
             {label}
           </button>
         ))}

@@ -57,17 +57,17 @@ export default function QueueView({ queue, queueIndex, onJump, onMove, onRemove,
 
   return (
     <div className="w-full glass-inset rounded-xl p-2 sm:p-3">
-      <div className="flex items-center gap-2 px-1 pb-2 text-sm text-gray-200 font-medium">
-        Up next
-        <span className="text-gray-500 font-normal">· {queue.length}</span>
+      <div className="flex items-center gap-2 px-1 pb-1.5">
+        <span className="text-xs font-medium text-gray-300">Up next</span>
+        <span className="text-[10px] text-gray-500 tabular-nums">{queue.length}</span>
         <span className="flex-1" />
         <button onClick={onSave} title="Save queue as playlist"
-          className="flex items-center gap-1 px-2 py-1 text-[11px] bg-black/30 border border-gray-800/50 rounded-lg text-gray-300 acc-hover-text transition-colors">
-          <Save className="w-3.5 h-3.5" /> Save
+          className="p-1 rounded-lg text-gray-400 acc-hover-text transition-colors">
+          <Save className="w-3.5 h-3.5" />
         </button>
         <button onClick={onClear} title="Clear queue"
-          className="flex items-center gap-1 px-2 py-1 text-[11px] bg-black/30 border border-gray-800/50 rounded-lg text-gray-300 hover:text-red-400 transition-colors">
-          <ListX className="w-3.5 h-3.5" /> Clear
+          className="p-1 rounded-lg text-gray-400 hover:text-red-400 transition-colors">
+          <ListX className="w-3.5 h-3.5" />
         </button>
       </div>
       <div

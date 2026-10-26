@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Footer from '@/components/sections/Footer';
 import Background from "@/components/background";
 import DownloadProgressComponent from "@/components/DownloadProgress";
-import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Settings, Palette, ArrowDownToLine, ListMusic } from "lucide-react";
+import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Settings, Palette, ArrowDownToLine, ListMusic, PictureInPicture2 } from "lucide-react";
 import AdvancedOptions from '@/components/sections/AdvancedOptions';
 import Personalize from '@/components/sections/Personalize';
 import DownloadButton from '@/components/DownloadButton';
@@ -126,11 +126,24 @@ export default function Home() {
         }
     };
     const [isMini, setIsMini] = useState(false);
+    const [miniOpen, setMiniOpen] = useState(false);
 
-    // Floating mini-player window shows ONLY the player: the mini loader
-    // navigates here with #mini (instant), IPC 'mini:mode' is the fallback.
+    // Track whether the floating mini player is on screen (toggle button state).
+    useEffect(() => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        api?.onMiniState?.((open) => setMiniOpen(open));
+        api?.queryMini?.();
+    }, []);
+
+    // Floating mini-player window shows ONLY the player. The packaged renderer
+    // is served from app:// without a hash, so the preload-provided
+    // `isMiniWindow` flag is the source of truth; hash and IPC stay as fallbacks.
     useEffect(() => {
         if (typeof window !== 'undefined') {
+            if (window.electronAPI?.isMiniWindow) {
+                setIsMini(true);
+                return;
+            }
             if (window.location.hash === '#mini') {
                 setIsMini(true);
                 return;
@@ -553,6 +566,13 @@ export default function Home() {
                         title="Info"
                     >
                         <InfoIcon className="w-5 h-5 text-gray-300 acc-hover-text transition-colors" />
+                    </button>
+                    <button
+                        onClick={() => window.electronAPI?.toggleMini?.()}
+                        className={`p-1.5 rounded-lg transition-colors acc-hover-text ${miniOpen ? 'bg-white/10 acc-text' : 'hover:bg-white/5'}`}
+                        title={miniOpen ? 'Close mini player' : 'Open mini player'}
+                    >
+                        <PictureInPicture2 className="w-5 h-5 text-gray-300 acc-hover-text transition-colors" />
                     </button>
                 </div>
 

@@ -30,9 +30,22 @@ export function isMiniOpen(): boolean {
   return !!miniWindow && !miniWindow.isDestroyed();
 }
 
+/** True when the window exists AND is actually on screen. */
+export function isMiniVisible(): boolean {
+  return isMiniOpen() && !!miniWindow?.isVisible();
+}
+
+function notifyMain(): void {
+  const main = getMainWindow();
+  if (main && !main.isDestroyed()) {
+    main.webContents.send('mini:state', { open: isMiniVisible() });
+  }
+}
+
 export function toggleMiniPlayer(): void {
-  if (isMiniOpen()) closeMiniPlayer();
+  if (isMiniVisible()) hideMiniPlayer();
   else ensureMiniPlayer();
+  notifyMain();
 }
 
 let miniPreloadPath: string | null = null;
@@ -72,6 +85,9 @@ export function ensureMiniPlayer(): BrowserWindow | null {
         nodeIntegration: false,
         sandbox: true,
         backgroundThrottling: false,
+        // Detected by the preload at startup: no hash/IPC race in production,
+        // where the renderer is served from the app:// protocol.
+        additionalArguments: ['--audit-mini'],
       },
     });
     if (loadMiniContent) loadMiniContent(miniWindow);
@@ -79,12 +95,14 @@ export function ensureMiniPlayer(): BrowserWindow | null {
 
     miniWindow.once('ready-to-show', () => {
       miniWindow?.show();
+      notifyMain();
     });
     miniWindow.webContents.on('did-finish-load', () => {
       miniWindow?.webContents.send('mini:mode');
     });
     miniWindow.on('closed', () => {
       miniWindow = null;
+      notifyMain();
     });
     return miniWindow;
   } catch (err) {
@@ -93,10 +111,22 @@ export function ensureMiniPlayer(): BrowserWindow | null {
   }
 }
 
+/**
+ * Hide (not destroy) so reopening is instant: the renderer keeps its state
+ * and the last player:state snapshot. The window is destroyed only on quit.
+ */
+export function hideMiniPlayer(): void {
+  if (isMiniOpen()) {
+    miniWindow?.hide();
+    notifyMain();
+  }
+}
+
 export function closeMiniPlayer(): void {
   if (isMiniOpen()) {
     miniWindow?.destroy();
     miniWindow = null;
+    notifyMain();
   }
 }
 
@@ -134,12 +164,26 @@ export function registerMiniIpc(): void {
       main.show();
       main.focus();
     }
-    closeMiniPlayer();
+    hideMiniPlayer();
   });
   ipcMain.on('mini:close', () => {
-    closeMiniPlayer();
+    // Closing the mini player brings the app back instead of leaving it
+    // hidden in the tray with no visible window.
+    const main = getMainWindow();
+    if (main && !main.isDestroyed()) {
+      main.show();
+      main.focus();
+    }
+    hideMiniPlayer();
+  });
+  ipcMain.on('mini:toggle', () => {
+    toggleMiniPlayer();
+  });
+  ipcMain.on('mini:query', (event) => {
+    event.sender.send('mini:state', { open: isMiniVisible() });
   });
   ipcMain.on('mini:show', () => {
     ensureMiniPlayer();
+    notifyMain();
   });
 }

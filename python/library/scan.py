@@ -14,6 +14,14 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# Embedded Python distributions run in "._pth" mode: the script directory is
+# NOT added to sys.path, so the local helper modules (tags_norm, genres) must
+# be registered explicitly or every scan fails with ImportError.
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+except Exception:
+    pass
+
 AUDIO_EXTS = {".mp3", ".m4a", ".mp4", ".flac", ".wav", ".opus", ".ogg", ".wma", ".aac"}
 
 try:
@@ -112,6 +120,15 @@ def scan_directory(root: str) -> Dict[str, Any]:
             })
         except Exception as exc:
             print(f"[scan] skipped {p}: {exc}", file=sys.stderr)
+    # Smart genre pass (tag normalization + album/artist votes + path rules).
+    try:
+        try:
+            from library.genres import infer_tracks
+        except ImportError:  # pragma: no cover - direct script fallback
+            from genres import infer_tracks  # type: ignore
+        infer_tracks(tracks)
+    except Exception as exc:
+        print(f"[scan] genre inference skipped: {exc}", file=sys.stderr)
     return {"success": True, "root": str(base), "count": len(tracks),
             "tracks": tracks, "error": ""}
 

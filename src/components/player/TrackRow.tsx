@@ -60,6 +60,14 @@ export default function TrackRow({
           </span>
         </span>
         {track.lrc && <Mic className="w-3.5 h-3.5 shrink-0 text-gray-600" />}
+        {track.genre_guess ? (
+          <span
+            className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-full acc-soft-20 acc-text shrink-0"
+            title={`${track.genre_rule || track.genre_source || 'metadata'}${typeof track.genre_confidence === 'number' ? ` · ${Math.round(track.genre_confidence * 100)}%` : ''}`}
+          >
+            {track.genre_guess}
+          </span>
+        ) : null}
         <span className="text-[11px] text-gray-500 tabular-nums shrink-0">{fmtDur(track.duration)}</span>
       </button>
       {trailing}
