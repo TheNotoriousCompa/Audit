@@ -49,7 +49,25 @@ const ffmpegExe = path.join(FFMPEG_DIR, 'bin', ffmpegExeName);
 // On Mac/Linux, simpler structure often used, but we'll normalize to /bin/ffmpeg
 const ffmpegExeSimple = path.join(FFMPEG_DIR, ffmpegExeName);
 
+// Old runs extracted the whole archive (ffprobe/ffplay ~130 MB each on
+// Windows). Keep only the binary the app actually calls.
+function pruneFFmpegBinaries() {
+    const binDir = path.join(FFMPEG_DIR, 'bin');
+    if (!fs.existsSync(binDir)) return;
+    let removed = 0;
+    for (const entry of fs.readdirSync(binDir)) {
+        const isMainBinary = entry === ffmpegExeName;
+        const isSharedLib = entry.endsWith('.dll') || entry.endsWith('.so') || entry.endsWith('.dylib');
+        if (!isMainBinary && !isSharedLib) {
+            fs.rmSync(path.join(binDir, entry), { force: true });
+            removed++;
+        }
+    }
+    if (removed > 0) console.log(`🧹 Removed ${removed} unused ffmpeg binaries (ffprobe/ffplay)`);
+}
+
 if (fs.existsSync(ffmpegExe) || fs.existsSync(ffmpegExeSimple)) {
+    pruneFFmpegBinaries();
     console.log('✓ FFmpeg already downloaded, skipping...\n');
     process.exit(0);
 }

@@ -73,6 +73,32 @@ const config = {
           callback();
         }
       });
+    },
+    // Chromium ships ~50 locale packs (~36 MB). Keep only the languages we use.
+    (buildPath, electronVersion, platform, arch, callback) => {
+      if (platform !== 'win32') {
+        callback();
+        return;
+      }
+      const appRoot = path.join(buildPath, '..', '..');
+      const localesDir = path.join(appRoot, 'locales');
+      const keep = new Set(['en-US.pak', 'it.pak']);
+      try {
+        let removed = 0;
+        if (fs.existsSync(localesDir)) {
+          for (const entry of fs.readdirSync(localesDir)) {
+            if (!keep.has(entry)) {
+              fs.removeSync(path.join(localesDir, entry));
+              removed++;
+            }
+          }
+        }
+        console.log(`✓ locales pruned (${removed} removed, kept en-US/it)`);
+        callback();
+      } catch (err) {
+        console.error('Failed to prune locales:', err);
+        callback(err);
+      }
     }],
     // Copy python and ffmpeg to extraResource directory directly outside app.asar
     extraResource: [

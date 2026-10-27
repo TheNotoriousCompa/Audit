@@ -215,6 +215,54 @@ async function postInstall() {
             execSync(`"${pythonBin}" -m pip ${pipArgs.join(' ')}`, { stdio: 'inherit' });
         }
     }
+
+    pruneRuntime();
+}
+
+/** Remove stdlib pieces the app never uses (tests, Tk, pip) to keep the bundle lean. */
+function pruneRuntime() {
+    const winLib = path.join(RUNTIME_DIR, 'Lib');
+    const unixLibRoot = path.join(RUNTIME_DIR, 'lib');
+    const candidates = ['test', 'idlelib', 'tkinter', 'turtledemo', 'ensurepip', 'lib2to3'];
+
+    const targets = candidates.map((name) => path.join(winLib, name));
+    if (fs.existsSync(unixLibRoot)) {
+        for (const version of fs.readdirSync(unixLibRoot)) {
+            for (const name of candidates) targets.push(path.join(unixLibRoot, version, name));
+        }
+    }
+    // pip is only needed at build time.
+    const sitePackages = path.join(winLib, 'site-packages');
+    if (fs.existsSync(sitePackages)) {
+        for (const entry of fs.readdirSync(sitePackages)) {
+            if (/^(pip|pip-|wheel|wheel-|_distutils_hack)/.test(entry)) {
+                targets.push(path.join(sitePackages, entry));
+            }
+        }
+    }
+
+    const dirSize = (dir) => {
+        let total = 0;
+        try {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) total += dirSize(full);
+                else total += fs.statSync(full).size;
+            }
+        } catch { /* ignore */ }
+        return total;
+    };
+
+    let saved = 0;
+    for (const target of targets) {
+        if (!fs.existsSync(target)) continue;
+        const size = dirSize(target);
+        try {
+            fs.rmSync(target, { recursive: true, force: true });
+            saved += size;
+        } catch { /* keep it */ }
+    }
+    if (saved > 0) console.log(`🧹 Pruned ${(saved / 1048576).toFixed(1)} MB of unused Python stdlib`);
 }
 
 async function main() {
