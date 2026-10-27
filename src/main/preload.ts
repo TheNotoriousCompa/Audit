@@ -1,7 +1,7 @@
 // preload.ts
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 // Importa i tipi dal file centrale
-import type { DownloadProgress, DownloadOptions, ElectronAPI, LibraryScanResult, TrackArt, MiniCommand, PlayerMiniState, WriteTagFields, WriteTagResult, LibraryCache } from '../types/electron.d.ts';
+import type { DownloadProgress, DownloadOptions, ElectronAPI, LibraryScanResult, TrackArt, MiniCommand, PlayerMiniState, WriteTagFields, WriteTagResult, LibraryCache, LibraryQuery, LibraryQueryResult, LibraryStats } from '../types/electron.d.ts';
 
 // Log che preload script è caricato
 console.log('Preload script loaded');
@@ -62,6 +62,15 @@ const electronAPI: ElectronAPI = {
   },
   saveLibraryCache: (cache: LibraryCache): Promise<boolean> => {
     return ipcRenderer.invoke('library:saveCache', cache);
+  },
+  libraryQuery: (options?: LibraryQuery): Promise<LibraryQueryResult> => {
+    return ipcRenderer.invoke('library:query', options ?? {});
+  },
+  libraryStats: (): Promise<LibraryStats> => {
+    return ipcRenderer.invoke('library:stats');
+  },
+  recordDownload: (filePath: string, sourceUrl?: string): Promise<boolean> => {
+    return ipcRenderer.invoke('library:recordDownload', filePath, sourceUrl);
   },
   onMiniCommand: (cb: (cmd: MiniCommand) => void): void => {
     ipcRenderer.on('mini:command', (_event, cmd: MiniCommand) => cb(cmd));

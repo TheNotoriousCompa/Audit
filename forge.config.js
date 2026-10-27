@@ -21,6 +21,7 @@ const config = {
           'electron-serve',
           'electron-squirrel-startup',
           'update-electron-app',
+          'better-sqlite3',
           'github-url-to-object',
           'ms',
           'debug',

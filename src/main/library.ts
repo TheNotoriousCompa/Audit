@@ -5,6 +5,7 @@ import { app } from 'electron';
 import isDev from 'electron-is-dev';
 import { logToFile } from './logger';
 import type { LibraryCache, LibraryScanResult, Track, TrackArt, WriteTagFields, WriteTagResult } from '../types/electron';
+import { initDb, listTracks, upsertTracks, replaceRoots, getRoots, getMeta, setMeta, importLibraryCache } from './db';
 
 const CACHE_VERSION = 1;
 
@@ -16,7 +17,7 @@ function getCachePath(): string {
   }
 }
 
-export function loadLibraryCache(): LibraryCache {
+function readLegacyCache(): LibraryCache {
   const empty: LibraryCache = { version: CACHE_VERSION, roots: [], scannedAt: 0, tracks: [] };
   try {
     const raw = fs.readFileSync(getCachePath(), 'utf-8');
@@ -32,8 +33,43 @@ export function loadLibraryCache(): LibraryCache {
   }
 }
 
+export function loadLibraryCache(): LibraryCache {
+  try {
+    initDb();
+    const tracks = listTracks();
+    if (tracks.length > 0) {
+      return {
+        version: CACHE_VERSION,
+        roots: getRoots(),
+        scannedAt: Number(getMeta('scannedAt') || 0),
+        tracks,
+      };
+    }
+    // First run with SQLite: import the legacy JSON cache once.
+    const legacy = readLegacyCache();
+    if (legacy.tracks.length > 0) {
+      importLibraryCache(legacy);
+      return {
+        version: CACHE_VERSION,
+        roots: getRoots(),
+        scannedAt: Number(getMeta('scannedAt') || 0),
+        tracks: listTracks(),
+      };
+    }
+    return { version: CACHE_VERSION, roots: [], scannedAt: 0, tracks: [] };
+  } catch (err) {
+    logToFile(`[DB] load failed: ${err instanceof Error ? err.message : String(err)}`);
+    return readLegacyCache();
+  }
+}
+
 export function saveLibraryCache(cache: LibraryCache): boolean {
   try {
+    initDb();
+    upsertTracks(cache.tracks);
+    replaceRoots(cache.roots);
+    setMeta('scannedAt', String(Date.now()));
+    // Keep the JSON as a human-readable backup while both stores coexist.
     const payload: LibraryCache = {
       version: CACHE_VERSION,
       roots: cache.roots,

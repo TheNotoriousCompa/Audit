@@ -8,6 +8,7 @@ import { initRenderer, createWindow, loadMainContent, getPreloadPath, getIconPat
 import { registerIPCHandlers } from './ipc-handlers';
 import { initAutoUpdater } from './auto-updater';
 import { registerMediaProtocolScheme, handleMediaProtocol } from './media-protocol';
+import { initDb } from './db';
 import {
   registerMiniIpc, setupCloseToMini, setMiniLoader, setMiniPreload, armQuitBypass,
 } from './mini-player';
@@ -26,6 +27,7 @@ if (isSquirrelShim) {
   logToFile(`--- App Starting (isDev: ${isDev}) ---`);
 
   app.whenReady().then(() => {
+    initDb();
     handleMediaProtocol();
     registerMiniIpc();
     setMiniPreload(getPreloadPath());

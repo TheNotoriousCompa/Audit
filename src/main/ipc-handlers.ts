@@ -2,7 +2,8 @@ import { ipcMain, dialog } from 'electron';
 import { getMainWindow } from './window';
 import { runDownload, stopDownload } from './python-bridge';
 import { scanLibrary, getTrackArt, writeTrackTags, loadLibraryCache, saveLibraryCache } from './library';
-import type { DownloadOptions, DownloadResult } from '../types/electron';
+import { queryTracks, libraryStats, recordDownload } from './db';
+import type { DownloadOptions, DownloadResult, LibraryQuery } from '../types/electron';
 
 export function registerIPCHandlers(): void {
   ipcMain.handle('dialog:openFolder', async () => {
@@ -82,4 +83,15 @@ export function registerIPCHandlers(): void {
   });
 
   ipcMain.on('download:stop', stopDownload);
+
+  // SQLite-backed library queries (sort/filter/pagination without loading
+  // the whole library into the renderer).
+  ipcMain.handle('library:query', (_event, options: LibraryQuery | undefined) => {
+    return queryTracks(options || {});
+  });
+  ipcMain.handle('library:stats', () => libraryStats());
+  ipcMain.handle('library:recordDownload', (_event, filePath: string, sourceUrl?: string) => {
+    recordDownload(String(filePath), sourceUrl ? String(sourceUrl) : undefined);
+    return true;
+  });
 }

@@ -86,6 +86,10 @@ export interface Track {
   genre_confidence?: number;
   genre_source?: 'tag' | 'album' | 'artist' | 'folder' | 'filename' | 'artist_seed' | '';
   genre_rule?: string;
+  /** When the scanner first saw the file (ms, optional). */
+  added_at?: number;
+  /** When Audit downloaded the file (ms, optional, from the downloads journal). */
+  downloaded_at?: number;
 }
 
 export interface LibraryScanResult {
@@ -101,6 +105,32 @@ export interface LibraryCache {
   roots: string[];
   scannedAt: number;
   tracks: Track[];
+}
+
+// ---- Library queries (SQLite-backed) ----
+export type LibrarySort = 'downloaded' | 'added' | 'title' | 'artist' | 'album' | 'duration' | 'rating';
+
+export interface LibraryQuery {
+  sort?: LibrarySort;
+  filter?: string;
+  /** Restrict to one canonical genre. */
+  genre?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface LibraryQueryResult {
+  total: number;
+  items: Track[];
+}
+
+export interface LibraryStats {
+  total: number;
+  withGenre: number;
+  downloaded: number;
+  artists: number;
+  albums: number;
+  genres: { genre: string; count: number }[];
 }
 
 export interface TrackArt {
@@ -161,6 +191,11 @@ export interface ElectronAPI {
   writeTags: (filePath: string, fields: WriteTagFields) => Promise<WriteTagResult>;
   loadLibraryCache: () => Promise<LibraryCache>;
   saveLibraryCache: (cache: LibraryCache) => Promise<boolean>;
+
+  // SQLite-backed library queries
+  libraryQuery: (options?: LibraryQuery) => Promise<LibraryQueryResult>;
+  libraryStats: () => Promise<LibraryStats>;
+  recordDownload: (filePath: string, sourceUrl?: string) => Promise<boolean>;
 
   // Mini player remote control
   onMiniCommand: (cb: (cmd: MiniCommand) => void) => void;
