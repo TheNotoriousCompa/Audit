@@ -16,6 +16,7 @@ Tipo: review statica, read-only. Nessuna modifica a codice, UI, asset o configur
 | `06-renderer.md` | S6 | stato, performance, coda, mini, accessibilita' |
 | `07-tests-tooling.md` | S7 | test mancanti, script, tsconfig, docs |
 | `08-final.md` | S8 | risk register, backlog, quick wins, verdetto |
+| `09-remediation.md` | post-review | fasi 0-3 implementate, test e residui |
 
 ## Severita'
 

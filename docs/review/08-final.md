@@ -3,6 +3,7 @@
 Snapshot: `dev` @ `2bda478`. Review statica completata su S0-S8.
 Copertura: 85 file visti, 8 non visti, 0 troncati.
 Finding totali: 55. Severita': 12 ARANCIONE, 33 GIALLO, 10 VERDE, 0 ROSSO.
+Remediation: le fasi 0-3 sono state applicate nel commit `77c9daa`; dettagli e verifiche in `09-remediation.md`. Il risk register seguente resta la baseline della review.
 
 ## 1. TL;DR
 
