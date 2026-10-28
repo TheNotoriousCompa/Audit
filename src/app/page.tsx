@@ -117,13 +117,29 @@ export default function Home() {
     // (auto-scan + queue of fresh files, optional autoplay).
     const [harvest, setHarvest] = useState<{ since: number; autoplay: boolean } | null>(null);
     const clearHarvest = useCallback(() => setHarvest(null), []);
+    const downloadRef = useRef<HTMLDivElement | null>(null);
+    const libraryRef = useRef<HTMLDivElement | null>(null);
     const switchTab = (t: 'download' | 'library') => {
+        if (t === tab) return;
         setTab(t);
         try {
             localStorage.setItem('audit-tab', t);
         } catch {
             // session-only
         }
+        // Animate the incoming section (same curve as the player views).
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const el = t === 'download' ? downloadRef.current : libraryRef.current;
+                el?.animate(
+                    [
+                        { opacity: 0, transform: 'translateY(-10px) scale(0.99)' },
+                        { opacity: 1, transform: 'none' },
+                    ],
+                    { duration: 260, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+                );
+            });
+        });
     };
     const [isMini, setIsMini] = useState(false);
     const [miniOpen, setMiniOpen] = useState(false);
@@ -632,21 +648,29 @@ export default function Home() {
             <div className="relative z-10 h-screen overflow-y-auto">
             <div className="flex flex-col items-center justify-center min-h-full p-4 pt-16">
                 <div className="w-full max-w-3xl glass-base rounded-2xl p-4 sm:p-6 md:p-8 mx-2 sm:mx-4">
-                    {/* Two distinct sections: Downloader vs Library & Player */}
-                    <div className="grid grid-cols-2 gap-2 mb-5">
+                    {/* Downloader / Library switch: sliding thumb, one clear state */}
+                    <div className="relative grid grid-cols-2 gap-1 p-1 rounded-2xl glass-inset mb-5">
+                        <span
+                            aria-hidden
+                            className="absolute top-1 bottom-1 rounded-xl acc-soft-20 border acc-border transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                            style={{
+                                left: tab === 'library' ? 'calc(50% + 0.125rem)' : '0.25rem',
+                                width: 'calc(50% - 0.375rem)',
+                            }}
+                        />
                         <button onClick={() => switchTab('download')}
-                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors ${tab === 'download' ? 'acc-soft-20 border acc-border' : 'glass-inset'}`}>
-                            <ArrowDownToLine className={`w-5 h-5 shrink-0 ${tab === 'download' ? 'acc-text' : 'text-gray-500'}`} />
+                            className="relative z-10 flex items-center gap-2.5 px-3 py-2 rounded-xl text-left">
+                            <ArrowDownToLine className={`w-5 h-5 shrink-0 transition-colors ${tab === 'download' ? 'acc-text' : 'text-gray-500'}`} />
                             <span className="min-w-0">
-                                <span className={`block text-xs sm:text-sm font-semibold ${tab === 'download' ? 'text-white' : 'text-gray-300'}`}>Downloader</span>
+                                <span className={`block text-xs sm:text-sm font-semibold transition-colors ${tab === 'download' ? 'text-white' : 'text-gray-300'}`}>Downloader</span>
                                 <span className="block text-[10px] sm:text-[11px] text-gray-500 truncate">YouTube → audio files</span>
                             </span>
                         </button>
                         <button onClick={() => switchTab('library')}
-                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors ${tab === 'library' ? 'acc-soft-20 border acc-border' : 'glass-inset'}`}>
-                            <ListMusic className={`w-5 h-5 shrink-0 ${tab === 'library' ? 'acc-text' : 'text-gray-500'}`} />
+                            className="relative z-10 flex items-center gap-2.5 px-3 py-2 rounded-xl text-left">
+                            <ListMusic className={`w-5 h-5 shrink-0 transition-colors ${tab === 'library' ? 'acc-text' : 'text-gray-500'}`} />
                             <span className="min-w-0">
-                                <span className={`block text-xs sm:text-sm font-semibold ${tab === 'library' ? 'text-white' : 'text-gray-300'}`}>Library & Player</span>
+                                <span className={`block text-xs sm:text-sm font-semibold transition-colors ${tab === 'library' ? 'text-white' : 'text-gray-300'}`}>Library & Player</span>
                                 <span className="block text-[10px] sm:text-[11px] text-gray-500 truncate">Your music, EQ, playlists</span>
                             </span>
                         </button>
@@ -654,7 +678,7 @@ export default function Home() {
                     <div className="space-y-5 w-full">
                         {/* Both sections stay mounted (hidden toggle): download input survives tab
                             switches, and the player keeps publishing state to the mini player. */}
-                        <div className={tab === 'download' ? 'flex flex-col gap-5' : 'hidden'}>
+                        <div ref={downloadRef} className={tab === 'download' ? 'flex flex-col gap-5' : 'hidden'}>
                         <div className="flex gap-2 w-full">
                             <div className="flex-1">
                                 <input
@@ -808,7 +832,7 @@ export default function Home() {
                             </div>
                         )}
                         </div>
-                        <div className={tab === 'library' ? 'flex flex-col gap-5' : 'hidden'}>
+                        <div ref={libraryRef} className={tab === 'library' ? 'flex flex-col gap-5' : 'hidden'}>
                         <PlayerSection outputFolder={outputFolder} lineColor={colors.lineColor} harvest={harvest} onHarvestDone={clearHarvest} />
                         </div>
                         <Footer />
