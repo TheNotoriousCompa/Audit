@@ -732,10 +732,10 @@ export default function Home() {
             )}
 
             <div className="relative z-10 h-screen overflow-y-auto">
-            <div className="flex flex-col items-center justify-start min-h-full p-4 pt-16 pb-8">
-                <div className="w-full max-w-3xl glass-base rounded-2xl p-4 sm:p-6 md:p-8 mx-2 sm:mx-4">
+            <div className="flex flex-col items-center justify-center min-h-full p-4 pt-16 pb-8">
+                <div className="w-full max-w-3xl glass-base rounded-2xl p-4 sm:p-6 md:p-8 mx-2 sm:mx-4 flex flex-col h-[calc(100vh-8.5rem)] max-h-[760px]">
                     {/* Downloader / Library switch: sliding thumb, one clear state */}
-                    <div className="relative grid grid-cols-2 gap-1 p-1 rounded-2xl glass-inset mb-5">
+                    <div className="relative grid grid-cols-2 gap-1 p-1 rounded-2xl glass-inset mb-5 shrink-0">
                         <span
                             aria-hidden
                             className="absolute top-1 bottom-1 rounded-xl acc-soft-20 border acc-border transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
@@ -761,7 +761,7 @@ export default function Home() {
                             </span>
                         </button>
                     </div>
-                    <div className="space-y-5 w-full">
+                    <div className="space-y-5 w-full flex-1 min-h-0 overflow-y-auto pr-1">
                         {/* Both sections stay mounted (hidden toggle): download input survives tab
                             switches, and the player keeps publishing state to the mini player. */}
                         <div ref={downloadRef} className={tab === 'download' ? 'flex flex-col gap-5' : 'hidden'}>

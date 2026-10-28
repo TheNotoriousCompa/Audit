@@ -407,7 +407,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
 
   return (
     <div className="space-y-2 w-full">
-      <div className="relative grid grid-cols-5 gap-1 rounded-xl glass-inset p-1">
+      <div className="relative grid grid-cols-5 gap-1 rounded-xl glass-inset p-1 sticky top-0 z-20">
         <span
           aria-hidden
           className="absolute top-1 bottom-1 rounded-lg acc-soft-20 border acc-border transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
