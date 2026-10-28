@@ -37,6 +37,7 @@ function shuffled<T>(arr: T[]): T[] {
 
 function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }: Props) {
   const [view, setView] = useState<View>('player');
+  const [slideDir, setSlideDir] = useState<1 | -1>(1);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [roots, setRoots] = useState<string[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -403,12 +404,26 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
     { id: 'eq', label: 'EQ', Icon: SlidersHorizontal },
   ];
 
+  const navIndex = Math.max(0, nav.findIndex((n) => n.id === view));
+
   return (
     <div className="space-y-2 w-full">
-      <div className="grid grid-cols-5 gap-1 rounded-xl bg-black/25 border border-white/5 p-1">
-        {nav.map(({ id, label, Icon }) => (
-          <button key={id} onClick={() => setView(id)}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 py-1 rounded-lg text-[10px] sm:text-[11px] font-medium transition-colors ${view === id ? 'acc-soft-20 acc-text' : 'text-gray-400 acc-hover-text'}`}>
+      <div className="relative grid grid-cols-5 gap-1 rounded-xl glass-inset p-1">
+        <span
+          aria-hidden
+          className="absolute top-1 bottom-1 rounded-lg acc-soft-20 border acc-border transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          style={{
+            left: `calc(${navIndex * 20}% + ${0.25 - navIndex * 0.05}rem)`,
+            width: 'calc(20% - 0.3rem)',
+          }}
+        />
+        {nav.map(({ id, label, Icon }, idx) => (
+          <button key={id}
+            onClick={() => {
+              setSlideDir(idx >= navIndex ? 1 : -1);
+              setView(id);
+            }}
+            className={`relative z-10 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 py-1 rounded-lg text-[10px] sm:text-[11px] font-medium transition-colors ${view === id ? 'acc-text' : 'text-gray-400 acc-hover-text'}`}>
             <Icon className="w-3.5 h-3.5" />
             {label}
           </button>
@@ -434,7 +449,11 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
         </div>
       )}
 
-      <div key={view} className="view-in">
+      <div
+        key={view}
+        className="view-in"
+        style={{ '--view-x': `${slideDir * 26}px` } as React.CSSProperties}
+      >
       {view === 'player' && (
         <>
           <NowPlaying

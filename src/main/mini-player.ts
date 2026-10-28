@@ -130,12 +130,12 @@ export function closeMiniPlayer(): void {
   }
 }
 
-/** Intercept main-window close: hide to tray + pop the mini player instead of quitting. */
-export function setupCloseToMini(mainWindow: BrowserWindow, onFirstHide?: () => void): void {
+/** Show the floating player when the main window is minimised. Closing the
+ *  main window quits the app instead (what users expect from a desktop app). */
+export function setupMinimizeToMini(mainWindow: BrowserWindow, onFirstHide?: () => void): void {
   let hinted = false;
-  mainWindow.on('close', (e) => {
+  mainWindow.on('minimize', () => {
     if (quitting) return;
-    e.preventDefault();
     mainWindow.hide();
     ensureMiniPlayer();
     if (!hinted) {
@@ -161,6 +161,7 @@ export function registerMiniIpc(): void {
   ipcMain.on('mini:expand', () => {
     const main = getMainWindow();
     if (main && !main.isDestroyed()) {
+      if (main.isMinimized()) main.restore();
       main.show();
       main.focus();
     }
@@ -168,9 +169,10 @@ export function registerMiniIpc(): void {
   });
   ipcMain.on('mini:close', () => {
     // Closing the mini player brings the app back instead of leaving it
-    // hidden in the tray with no visible window.
+    // hidden with no visible window.
     const main = getMainWindow();
     if (main && !main.isDestroyed()) {
+      if (main.isMinimized()) main.restore();
       main.show();
       main.focus();
     }

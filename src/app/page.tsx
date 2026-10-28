@@ -3,8 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Footer from '@/components/sections/Footer';
 import Background from "@/components/background";
 import DownloadProgressComponent from "@/components/DownloadProgress";
-import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Settings, Palette, ArrowDownToLine, ListMusic, PictureInPicture2 } from "lucide-react";
-import AdvancedOptions from '@/components/sections/AdvancedOptions';
+import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Palette, ArrowDownToLine, ListMusic, PictureInPicture2 } from "lucide-react";
 import Personalize from '@/components/sections/Personalize';
 import DownloadButton from '@/components/DownloadButton';
 import StatusMessage from '@/components/StatusMessage';
@@ -55,8 +54,6 @@ export default function Home() {
     const [quality, setQuality] = useState("320");
     const [format, setFormat] = useState('mp3');
     const [fps, setFps] = useState<number | null>(null);
-    const [showAdvanced, setShowAdvanced] = useState(false);
-    // Advanced options removed from UI but keeping defaults
     const skipExisting = true;
     const timeout = 300;
     const [showPersonalize, setShowPersonalize] = useState(false);
@@ -679,6 +676,52 @@ export default function Home() {
                         {/* Both sections stay mounted (hidden toggle): download input survives tab
                             switches, and the player keeps publishing state to the mini player. */}
                         <div ref={downloadRef} className={tab === 'download' ? 'flex flex-col gap-5' : 'hidden'}>
+                        {/* Download options: two settings, always visible, Info/Colors styling */}
+                        <div className="rounded-xl border border-white/5 divide-y divide-white/5">
+                            <div className="flex items-center justify-between gap-3 px-3 py-2">
+                                <span className="text-[11px] text-gray-400">Format</span>
+                                <div className="flex gap-1">
+                                    {(['mp3', 'mp4'] as const).map((f) => (
+                                        <button key={f}
+                                            onClick={() => {
+                                                setFormat(f);
+                                                setQuality(f === 'mp4' ? '1080p' : '320');
+                                                setFps(null);
+                                            }}
+                                            className={`px-2.5 py-1 rounded-lg text-[10px] uppercase tracking-wider border transition-colors ${format === f ? 'acc-soft-20 acc-text acc-border' : 'border-transparent text-gray-400 hover:bg-white/5'}`}>
+                                            {f}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3 px-3 py-2">
+                                <span className="text-[11px] text-gray-400">{format === 'mp4' ? 'Resolution' : 'Bitrate'}</span>
+                                <div className="flex gap-1 flex-wrap justify-end">
+                                    {(format === 'mp4' ? ['1080p', '720p', '480p', '360p'] : ['320', '256', '192', '128']).map((q) => (
+                                        <button key={q} onClick={() => setQuality(q)}
+                                            className={`px-2 py-1 rounded-lg text-[10px] tabular-nums border transition-colors ${quality === q ? 'acc-soft-20 acc-text acc-border' : 'border-transparent text-gray-400 hover:bg-white/5'}`}>
+                                            {format === 'mp4' ? q : `${q}k`}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {format === 'mp4' && (
+                                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                                    <span className="text-[11px] text-gray-400">Framerate</span>
+                                    <div className="flex gap-1">
+                                        {[{ v: null as number | null, l: 'Auto' }, { v: 30, l: '30' }, { v: 60, l: '60' }].map(({ v, l }) => (
+                                            <button key={l} onClick={() => setFps(v)}
+                                                className={`px-2 py-1 rounded-lg text-[10px] border transition-colors ${fps === v ? 'acc-soft-20 acc-text acc-border' : 'border-transparent text-gray-400 hover:bg-white/5'}`}>
+                                                {l}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="flex gap-2 w-full">
                             <div className="flex-1">
                                 <input
@@ -769,48 +812,6 @@ export default function Home() {
                             }}
                         />
 
-
-                        {/* Advanced Options (downloader-scoped gear) */}
-                        <button
-                            onClick={() => setShowAdvanced(!showAdvanced)}
-                            className={`glass ${showAdvanced ? 'glass-active' : 'glass-hover'} flex items-center justify-between w-full px-4 py-2.5 rounded-full text-left transition-all duration-200 group`}
-                            title="Advanced Options"
-                            aria-expanded={showAdvanced}
-                        >
-                            <span className="flex items-center gap-2.5 min-w-0">
-                                <span className={`flex items-center justify-center w-6 h-6 shrink-0 rounded-full border transition-colors duration-200 ${showAdvanced ? 'acc-soft-20 acc-border acc-text' : 'bg-white/5 border-white/10 text-gray-300 acc-group-hover-text'}`}>
-                                    <Settings className="w-3.5 h-3.5 transition-colors" />
-                                </span>
-                                <span className={`text-[11px] font-medium uppercase tracking-widest transition-colors duration-200 ${showAdvanced ? 'text-gray-100' : 'text-gray-400 group-hover:text-gray-200'}`}>
-                                    Download options
-                                </span>
-                            </span>
-                            <svg
-                                className={`w-3.5 h-3.5 shrink-0 text-gray-400 acc-group-hover-text transition-transform duration-300 ${showAdvanced ? 'rotate-180' : ''}`}
-                                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        <AdvancedOptions
-                            show={showAdvanced}
-                            format={format}
-                            setFormat={(f) => {
-                                setFormat(f);
-                                // Default quality settings when switching formats
-                                if (f === 'mp4') {
-                                    setQuality('1080p');
-                                    setFps(null); // Reset FPS to Auto
-                                } else {
-                                    setQuality('320');
-                                    setFps(null);
-                                }
-                            }}
-                            quality={quality}
-                            setQuality={setQuality}
-                            fps={fps}
-                            setFps={setFps}
-                        />
 
                         {/* Progress Bar - Always show if there's any progress data */}
                         <div className="w-full">

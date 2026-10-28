@@ -88,16 +88,15 @@ body {
   accent-color: var(--audit-accent, #1ed760);
 }
 
-/* Player view entry: same language as the main-menu popovers. CSS animation
-   (not rAF-driven) so it still completes when frames are throttled. */
+/* Player view entry: slide from the side of the target nav item. */
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.98);
+    transform: translate3d(var(--view-x, 0px), -10px, 0) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 

@@ -10,7 +10,7 @@ import { initAutoUpdater } from './auto-updater';
 import { registerMediaProtocolScheme, handleMediaProtocol } from './media-protocol';
 import { initDb } from './db';
 import {
-  registerMiniIpc, setupCloseToMini, setMiniLoader, setMiniPreload, armQuitBypass,
+  registerMiniIpc, setupMinimizeToMini, setMiniLoader, setMiniPreload, armQuitBypass,
 } from './mini-player';
 import { setupTray, showMiniHint } from './tray';
 
@@ -33,7 +33,12 @@ if (isSquirrelShim) {
     setMiniPreload(getPreloadPath());
     setMiniLoader((mini) => loadMainContent(mini, true));
     const win = createWindow();
-    setupCloseToMini(win, () => showMiniHint());
+    setupMinimizeToMini(win, () => showMiniHint());
+    // Closing the main window quits the app (Windows/Linux). The mini window
+    // is an accessory, so it must not keep the process alive.
+    win.on('closed', () => {
+      if (process.platform !== 'darwin') app.quit();
+    });
     registerIPCHandlers();
     setupTray(getIconPath(), () => {
       armQuitBypass();
