@@ -78,7 +78,7 @@ export default function FoldersView({
 
       {roots.length === 0 && (
         <div className="text-[11px] sm:text-xs text-gray-500">
-          No music folders yet — add one (tip: your Audit download folder) then scan.
+          No folders yet. Add one and scan.
         </div>
       )}
 

@@ -68,11 +68,17 @@ export default function LibraryHome({
   const [cat, setCat] = useState<CategoryKind | null>(null);
   const [group, setGroup] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
-  const [sort, setSort] = useState<LibrarySort>(() => {
-    if (typeof window === 'undefined') return 'title';
-    const saved = window.localStorage.getItem(SORT_KEY) as LibrarySort | null;
-    return saved && SORT_OPTIONS.some((o) => o.value === saved) ? saved : 'title';
-  });
+  // Deterministic first render (server + client), then restore the saved sort.
+  const [sort, setSort] = useState<LibrarySort>('title');
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(SORT_KEY) as LibrarySort | null;
+      if (saved && SORT_OPTIONS.some((o) => o.value === saved)) setSort(saved);
+    } catch {
+      // keep default
+    }
+  }, []);
   const [items, setItems] = useState<Track[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);

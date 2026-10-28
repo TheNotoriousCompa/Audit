@@ -1,5 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Disc3, Library, FolderOpen, ListMusic, SlidersHorizontal } from 'lucide-react';
 import type { Track } from '@/types/electron';
 import LibraryHome from './LibraryHome';
@@ -434,6 +435,12 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
         </div>
       )}
 
+      <motion.div
+        key={view}
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+      >
       {view === 'player' && (
         <>
           <NowPlaying
@@ -510,6 +517,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
       )}
 
       {view === 'eq' && <EqualizerPanel />}
+      </motion.div>
 
       <PlayerBar queue={queue} queueIndex={queueIndex} onAdvance={setQueueIndex}
         controlRef={transportRef} onPlayingChange={setPlaying} onAudioReady={setAudioEl}
