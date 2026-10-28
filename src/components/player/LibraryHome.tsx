@@ -1,14 +1,13 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, ChevronLeft, Music2, Users, Disc3, Tags, Clock, Star } from 'lucide-react';
+import { Search, ChevronLeft, Music2, Users, Disc3, Tags, Clock } from 'lucide-react';
 import type { LibrarySort, Track } from '@/types/electron';
 import TrackRow, { PlaylistRef } from './TrackRow';
 
-export type CategoryKind = 'all' | 'artists' | 'albums' | 'genres' | 'recent' | 'top';
+export type CategoryKind = 'all' | 'artists' | 'albums' | 'genres' | 'recent';
 
 interface Props {
   tracks: Track[];
-  ratings: Record<string, number>;
   playlists: PlaylistRef[];
   onPlay: (track: Track, context: Track[]) => void;
   onPlayNext: (track: Track) => void;
@@ -25,7 +24,6 @@ const SORT_OPTIONS: { value: LibrarySort; label: string }[] = [
   { value: 'artist', label: 'Artist' },
   { value: 'album', label: 'Album' },
   { value: 'duration', label: 'Duration' },
-  { value: 'rating', label: 'Rating' },
 ];
 
 function normKey(s: string): string {
@@ -65,7 +63,7 @@ function groupBy(tracks: Track[], key: (t: Track) => string): { name: string; it
 }
 
 export default function LibraryHome({
-  tracks, ratings, playlists, onPlay, onPlayNext, onAddToQueue, onAddToPlaylist, onEditTags,
+  tracks, playlists, onPlay, onPlayNext, onAddToQueue, onAddToPlaylist, onEditTags,
 }: Props) {
   const [cat, setCat] = useState<CategoryKind | null>(null);
   const [group, setGroup] = useState<string | null>(null);
@@ -91,16 +89,14 @@ export default function LibraryHome({
       tracks.map((t) => (t.genre_guess || '').trim()).filter((g) => g.length > 0)
     ).size;
     const downloaded = tracks.filter((t) => typeof t.downloaded_at === 'number').length;
-    const top = tracks.filter((t) => (ratings[t.path] || 0) >= 4).length;
     return [
       { kind: 'all' as CategoryKind, label: 'All Songs', count: tracks.length, Icon: Music2 },
       { kind: 'artists' as CategoryKind, label: 'Artists', count: artists, Icon: Users },
       { kind: 'albums' as CategoryKind, label: 'Albums', count: albums, Icon: Disc3 },
       { kind: 'genres' as CategoryKind, label: 'Genres', count: genres, Icon: Tags },
       { kind: 'recent' as CategoryKind, label: 'Recently downloaded', count: downloaded || Math.min(50, tracks.length), Icon: Clock },
-      { kind: 'top' as CategoryKind, label: 'Top Rated', count: top, Icon: Star },
     ];
-  }, [tracks, ratings]);
+  }, [tracks]);
 
   const groups = useMemo(() => {
     if (!cat) return null;
@@ -115,14 +111,9 @@ export default function LibraryHome({
     const q = filter.trim().toLowerCase();
     const match = (t: Track) =>
       !q || `${t.title} ${t.artist} ${t.album} ${t.genre} ${t.genre_guess} ${t.filename}`.toLowerCase().includes(q);
-    if (cat === 'top') {
-      return tracks
-        .filter((t) => (ratings[t.path] || 0) > 0 && match(t))
-        .sort((a, b) => (ratings[b.path] || 0) - (ratings[a.path] || 0) || a.title.localeCompare(b.title));
-    }
     if (group) return (groups?.find((g) => g.name === group)?.items || []).filter(match);
     return [];
-  }, [cat, group, groups, tracks, ratings, filter]);
+  }, [cat, group, groups, tracks, filter]);
 
   const fetchPage = useCallback(async (reset: boolean) => {
     const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
@@ -225,7 +216,7 @@ export default function LibraryHome({
         </div>
       )}
 
-      {cat && (group || dbView || cat === 'top') && (
+      {cat && (group || dbView) && (
         <>
           <div className="relative my-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />

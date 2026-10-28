@@ -13,7 +13,6 @@ import TagEditor from './TagEditor';
 import {
   Playlist, loadPlaylists, savePlaylists, createPlaylist, resolvePlaylist,
 } from './playlists';
-import { loadRatings, saveRatings } from './ratings';
 
 interface Props {
   outputFolder: string | null;
@@ -45,7 +44,6 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
   const [queue, setQueue] = useState<Track[]>([]);
   const [queueIndex, setQueueIndex] = useState(-1);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [ratings, setRatings] = useState<Record<string, number>>({});
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.9);
   const [notice, setNotice] = useState<string | null>(null);
@@ -89,7 +87,6 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
         }
       }
       setPlaylists(loadPlaylists());
-      setRatings(loadRatings());
     };
     void boot();
     return () => {
@@ -442,19 +439,10 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
           <NowPlaying
             track={current}
             queuePosition={queuePos}
-            rating={current ? ratings[current.path] || 0 : 0}
             playing={playing}
             onToggle={() => transportRef.current?.toggle()}
             onPrev={() => transportRef.current?.prev()}
             onNext={() => transportRef.current?.next()}
-            onRate={(stars) => {
-              if (!current) return;
-              const next = { ...ratings };
-              if (stars === 0) delete next[current.path];
-              else next[current.path] = stars;
-              setRatings(next);
-              saveRatings(next);
-            }}
             lineColor={lineColor}
           />
           <QueueView
@@ -472,7 +460,6 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
       {view === 'library' && (
         <LibraryHome
           tracks={tracks}
-          ratings={ratings}
           playlists={playlists}
           onPlay={playTrack}
           onPlayNext={playNext}

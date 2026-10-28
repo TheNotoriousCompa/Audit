@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import { Star, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 import type { Track } from '@/types/electron';
 import { useArt } from './useArt';
 import Visualizer from './Visualizer';
@@ -9,8 +9,6 @@ import DiskPlaceholder from './DiskPlaceholder';
 interface Props {
   track: Track | undefined;
   queuePosition: string;
-  rating: number;
-  onRate: (stars: number) => void;
   lineColor: string;
   playing: boolean;
   onToggle: () => void;
@@ -19,7 +17,7 @@ interface Props {
 }
 
 export default function NowPlaying({
-  track, queuePosition, rating, onRate, lineColor, playing, onToggle, onPrev, onNext,
+  track, queuePosition, lineColor, playing, onToggle, onPrev, onNext,
 }: Props) {
   const art = useArt(track?.path);
 
@@ -43,29 +41,19 @@ export default function NowPlaying({
           <div className="text-[11px] acc-text truncate">{track?.artist || '—'}</div>
         </div>
 
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <div className="flex items-center gap-0.5" title="Rating">
-            {[1, 2, 3, 4, 5].map((s) => (
-              <button key={s} onClick={() => track && onRate(rating === s ? 0 : s)}
-                className="p-0.5 transition-colors" title={`${s} star${s > 1 ? 's' : ''}`}>
-                <Star className={`w-3 h-3 ${s <= rating ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`} />
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-0.5">
-            <button onClick={onPrev} title="Previous" disabled={!track}
-              className="p-1 rounded-lg text-gray-300 acc-hover-text transition-colors disabled:opacity-30">
-              <SkipBack className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={onToggle} title={playing ? 'Pause' : 'Play'} disabled={!track}
-              className="p-1.5 rounded-full acc-soft-40 acc-hover-60 border acc-border text-white transition-colors disabled:opacity-30">
-              {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            </button>
-            <button onClick={onNext} title="Next" disabled={!track}
-              className="p-1 rounded-lg text-gray-300 acc-hover-text transition-colors disabled:opacity-30">
-              <SkipForward className="w-3.5 h-3.5" />
-            </button>
-          </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button onClick={onPrev} title="Previous" disabled={!track}
+            className="p-1 rounded-lg text-gray-300 acc-hover-text transition-colors disabled:opacity-30">
+            <SkipBack className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={onToggle} title={playing ? 'Pause' : 'Play'} disabled={!track}
+            className="p-1.5 rounded-full acc-soft-40 acc-hover-60 border acc-border text-white transition-colors disabled:opacity-30">
+            {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+          </button>
+          <button onClick={onNext} title="Next" disabled={!track}
+            className="p-1 rounded-lg text-gray-300 acc-hover-text transition-colors disabled:opacity-30">
+            <SkipForward className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 

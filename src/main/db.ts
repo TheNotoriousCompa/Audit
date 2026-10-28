@@ -7,8 +7,8 @@ import type { LibraryCache, Track } from '../types/electron';
 
 /**
  * Local SQLite store: single source of truth for the library, download history
- * and (later) ratings/playlists. better-sqlite3 v13 ships N-API prebuilds, so
- * the same package works in Electron on Windows and macOS without rebuilds.
+ * and (later) playlists. better-sqlite3 11.x is built for Electron's ABI via
+ * electron-rebuild, so the same package works on Windows and macOS.
  */
 
 const SCHEMA_VERSION = 1;
@@ -86,11 +86,6 @@ function migrate(database: Database.Database): void {
         path TEXT PRIMARY KEY,
         downloaded_at INTEGER NOT NULL,
         source_url TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS ratings (
-        path TEXT PRIMARY KEY,
-        stars INTEGER NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS playlists (
@@ -279,7 +274,6 @@ const ORDER_BY: Record<LibrarySort, string> = {
   artist: "CASE WHEN t.artist = '' THEN 1 ELSE 0 END, t.artist COLLATE NOCASE ASC, t.title COLLATE NOCASE ASC",
   album: "CASE WHEN t.album = '' THEN 1 ELSE 0 END, t.album COLLATE NOCASE ASC, t.title COLLATE NOCASE ASC",
   duration: 't.duration DESC',
-  rating: 'COALESCE(r.stars, 0) DESC, t.title COLLATE NOCASE ASC',
 };
 
 function ftsQuery(text: string): string {
@@ -319,9 +313,8 @@ export function queryTracks(options: LibraryQuery = {}): LibraryQueryResult {
 
   const rows = database
     .prepare(
-      `SELECT t.*, r.stars AS rating
+      `SELECT t.*
        FROM tracks t
-       LEFT JOIN ratings r ON r.path = t.path
        ${whereSql}
        ORDER BY ${ORDER_BY[sort]}
        LIMIT @limit OFFSET @offset`

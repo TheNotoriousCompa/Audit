@@ -108,7 +108,7 @@ export interface LibraryCache {
 }
 
 // ---- Library queries (SQLite-backed) ----
-export type LibrarySort = 'downloaded' | 'added' | 'title' | 'artist' | 'album' | 'duration' | 'rating';
+export type LibrarySort = 'downloaded' | 'added' | 'title' | 'artist' | 'album' | 'duration';
 
 export interface LibraryQuery {
   sort?: LibrarySort;
