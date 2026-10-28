@@ -88,6 +88,23 @@ body {
   accent-color: var(--audit-accent, #1ed760);
 }
 
+/* Player view entry: same language as the main-menu popovers. CSS animation
+   (not rAF-driven) so it still completes when frames are throttled. */
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.view-in {
+  animation: view-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ---- Audit accent: single theme color driven by the style picker ----
    Set --audit-accent on <main> from the user's wave line color. All
    player/library greens go through these utilities (Spotify rule:
