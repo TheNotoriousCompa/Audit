@@ -4,6 +4,7 @@ import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import isDev from 'electron-is-dev';
 import { logToFile } from './logger';
 import { getMainWindow } from './window';
+import { recordDownload } from './db';
 import type { DownloadOptions, DownloadResult, DownloadProgress, DownloadStatus } from '../types/electron';
 
 let currentPythonProcess: ChildProcessWithoutNullStreams | null = null;
@@ -204,12 +205,35 @@ export function runDownload(url: string, options: DownloadOptions): Promise<Down
         try {
           const parsed = JSON.parse(trimmed);
           if (parsed.type === 'progress' && parsed.data) {
-            sendProgressToRenderer(safeProgressData(parsed.data));
+            // Per-track finish event from the Python sidecar: journal it and
+            // keep it out of the UI progress stream.
+            if (String(parsed.data.status) === 'saved' && parsed.data.path) {
+              try {
+                recordDownload(
+                  String(parsed.data.path),
+                  parsed.data.source_url ? String(parsed.data.source_url) : undefined
+                );
+              } catch {
+                // journal is best-effort
+              }
+            } else {
+              sendProgressToRenderer(safeProgressData(parsed.data));
+            }
           } else if (parsed.type === 'result' && parsed.data) {
+            const outputPath = String(parsed.data.output_path || '');
+            if (Boolean(parsed.data.success) && outputPath) {
+              try {
+                if (fs.existsSync(outputPath) && fs.statSync(outputPath).isFile()) {
+                  recordDownload(outputPath);
+                }
+              } catch {
+                // journal is best-effort
+              }
+            }
             resolveOnce({
               success: Boolean(parsed.data.success),
               message: String(parsed.data.message || ''),
-              outputPath: String(parsed.data.output_path || ''),
+              outputPath,
               error: String(parsed.data.error || ''),
             });
             return;

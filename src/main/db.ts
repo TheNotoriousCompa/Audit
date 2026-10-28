@@ -276,8 +276,8 @@ const ORDER_BY: Record<LibrarySort, string> = {
   downloaded: 'COALESCE(t.downloaded_at, t.mtime) DESC, t.title COLLATE NOCASE ASC',
   added: 'COALESCE(t.added_at, t.mtime) DESC, t.title COLLATE NOCASE ASC',
   title: 't.title COLLATE NOCASE ASC',
-  artist: 't.artist COLLATE NOCASE ASC, t.title COLLATE NOCASE ASC',
-  album: 't.album COLLATE NOCASE ASC, t.title COLLATE NOCASE ASC',
+  artist: "CASE WHEN t.artist = '' THEN 1 ELSE 0 END, t.artist COLLATE NOCASE ASC, t.title COLLATE NOCASE ASC",
+  album: "CASE WHEN t.album = '' THEN 1 ELSE 0 END, t.album COLLATE NOCASE ASC, t.title COLLATE NOCASE ASC",
   duration: 't.duration DESC',
   rating: 'COALESCE(r.stars, 0) DESC, t.title COLLATE NOCASE ASC',
 };

@@ -1,7 +1,7 @@
 "use client";
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, ChevronLeft, Music2, Users, Disc3, Tags, Clock, Star } from 'lucide-react';
-import type { Track } from '@/types/electron';
+import type { LibrarySort, Track } from '@/types/electron';
 import TrackRow, { PlaylistRef } from './TrackRow';
 
 export type CategoryKind = 'all' | 'artists' | 'albums' | 'genres' | 'recent' | 'top';
@@ -16,6 +16,17 @@ interface Props {
   onAddToPlaylist: (playlistId: string, track: Track) => void;
   onEditTags: (track: Track) => void;
 }
+
+const PAGE_SIZE = 200;
+const SORT_KEY = 'audit-library-sort';
+const SORT_OPTIONS: { value: LibrarySort; label: string }[] = [
+  { value: 'downloaded', label: 'Recently downloaded' },
+  { value: 'title', label: 'Title' },
+  { value: 'artist', label: 'Artist' },
+  { value: 'album', label: 'Album' },
+  { value: 'duration', label: 'Duration' },
+  { value: 'rating', label: 'Rating' },
+];
 
 function normKey(s: string): string {
   return s
@@ -40,7 +51,6 @@ function groupBy(tracks: Track[], key: (t: Track) => string): { name: string; it
     g.items.push(t);
     const cm = counts.get(k)!;
     cm.set(raw, (cm.get(raw) || 0) + 1);
-    // Display the most common original spelling.
     let best = g.name;
     let bestN = -1;
     for (const [spelling, n] of cm) {
@@ -60,6 +70,19 @@ export default function LibraryHome({
   const [cat, setCat] = useState<CategoryKind | null>(null);
   const [group, setGroup] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const [sort, setSort] = useState<LibrarySort>(() => {
+    if (typeof window === 'undefined') return 'title';
+    const saved = window.localStorage.getItem(SORT_KEY) as LibrarySort | null;
+    return saved && SORT_OPTIONS.some((o) => o.value === saved) ? saved : 'title';
+  });
+  const [items, setItems] = useState<Track[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const offsetRef = useRef(0);
+
+  // Views backed by SQLite (sort + pagination). Groups stay in-memory for now.
+  const dbView = cat === 'all' || cat === 'recent';
+  const effectiveSort: LibrarySort = cat === 'recent' ? 'downloaded' : sort;
 
   const tiles = useMemo(() => {
     const artists = new Set(tracks.map((t) => normKey(t.artist || 'Unknown'))).size;
@@ -67,13 +90,14 @@ export default function LibraryHome({
     const genres = new Set(
       tracks.map((t) => (t.genre_guess || '').trim()).filter((g) => g.length > 0)
     ).size;
+    const downloaded = tracks.filter((t) => typeof t.downloaded_at === 'number').length;
     const top = tracks.filter((t) => (ratings[t.path] || 0) >= 4).length;
     return [
       { kind: 'all' as CategoryKind, label: 'All Songs', count: tracks.length, Icon: Music2 },
       { kind: 'artists' as CategoryKind, label: 'Artists', count: artists, Icon: Users },
       { kind: 'albums' as CategoryKind, label: 'Albums', count: albums, Icon: Disc3 },
       { kind: 'genres' as CategoryKind, label: 'Genres', count: genres, Icon: Tags },
-      { kind: 'recent' as CategoryKind, label: 'Recently Added', count: Math.min(50, tracks.length), Icon: Clock },
+      { kind: 'recent' as CategoryKind, label: 'Recently downloaded', count: downloaded || Math.min(50, tracks.length), Icon: Clock },
       { kind: 'top' as CategoryKind, label: 'Top Rated', count: top, Icon: Star },
     ];
   }, [tracks, ratings]);
@@ -86,13 +110,11 @@ export default function LibraryHome({
     return null;
   }, [cat, tracks]);
 
-  const list: Track[] = useMemo(() => {
+  const groupedList: Track[] = useMemo(() => {
     if (!cat) return [];
     const q = filter.trim().toLowerCase();
     const match = (t: Track) =>
       !q || `${t.title} ${t.artist} ${t.album} ${t.genre} ${t.genre_guess} ${t.filename}`.toLowerCase().includes(q);
-    if (cat === 'all') return tracks.filter(match);
-    if (cat === 'recent') return [...tracks].sort((a, b) => b.mtime - a.mtime).slice(0, 50).filter(match);
     if (cat === 'top') {
       return tracks
         .filter((t) => (ratings[t.path] || 0) > 0 && match(t))
@@ -102,10 +124,59 @@ export default function LibraryHome({
     return [];
   }, [cat, group, groups, tracks, ratings, filter]);
 
+  const fetchPage = useCallback(async (reset: boolean) => {
+    const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+    if (!api?.libraryQuery) {
+      // Browser preview without preload: fall back to in-memory sorting.
+      const q = filter.trim().toLowerCase();
+      const match = (t: Track) =>
+        !q || `${t.title} ${t.artist} ${t.album} ${t.genre} ${t.genre_guess} ${t.filename}`.toLowerCase().includes(q);
+      const sorted = [...tracks].filter(match).sort((a, b) => {
+        if (effectiveSort === 'downloaded') return (b.downloaded_at ?? b.mtime) - (a.downloaded_at ?? a.mtime);
+        if (effectiveSort === 'artist') return a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title);
+        if (effectiveSort === 'album') return a.album.localeCompare(b.album) || a.title.localeCompare(b.title);
+        if (effectiveSort === 'duration') return b.duration - a.duration;
+        return a.title.localeCompare(b.title);
+      });
+      setItems(sorted);
+      setTotal(sorted.length);
+      return;
+    }
+    const offset = reset ? 0 : offsetRef.current;
+    setLoading(true);
+    try {
+      const res = await api.libraryQuery({
+        sort: effectiveSort,
+        filter: filter.trim() || undefined,
+        limit: PAGE_SIZE,
+        offset,
+      });
+      offsetRef.current = offset + res.items.length;
+      setItems((prev) => (reset ? res.items : [...prev, ...res.items]));
+      setTotal(res.total);
+    } finally {
+      setLoading(false);
+    }
+  }, [effectiveSort, filter, tracks]);
+
+  useEffect(() => {
+    if (!dbView) return;
+    offsetRef.current = 0;
+    const timer = setTimeout(() => { void fetchPage(true); }, 180);
+    return () => clearTimeout(timer);
+  }, [dbView, cat, filter, effectiveSort, fetchPage]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(SORT_KEY, sort); } catch { /* session-only */ }
+  }, [sort]);
+
+  const list = dbView ? items : groupedList;
+
   const open = (kind: CategoryKind) => {
     setCat(kind);
     setGroup(null);
     setFilter('');
+    if (kind === 'recent') setSort('downloaded');
   };
   const back = () => {
     if (group) setGroup(null);
@@ -115,14 +186,14 @@ export default function LibraryHome({
   return (
     <div className="w-full glass-inset rounded-xl p-3 sm:p-4">
       <div className="flex items-center gap-2 mb-2">
-        {(cat) && (
+        {cat && (
           <button onClick={back} title="Back" className="p-1.5 rounded-lg text-gray-300 acc-hover-text transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
         )}
         <div className="text-sm text-gray-200 font-medium">
           {!cat ? 'Library' : group || tiles.find((t) => t.kind === cat)?.label}
-          <span className="text-gray-500 font-normal"> · {tracks.length} songs</span>
+          <span className="text-gray-500 font-normal"> · {total || tracks.length} songs</span>
         </div>
       </div>
 
@@ -154,15 +225,35 @@ export default function LibraryHome({
         </div>
       )}
 
-      {cat && (group || cat === 'all' || cat === 'recent' || cat === 'top') && (
+      {cat && (group || dbView || cat === 'top') && (
         <>
           <div className="relative my-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search…"
               className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-black/30 border border-gray-800/50 rounded-xl outline-none text-gray-100 placeholder-gray-500 acc-focus" />
           </div>
+
+          {dbView && (
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] uppercase tracking-wider text-gray-500">Sort</span>
+              <select
+                value={effectiveSort}
+                disabled={cat === 'recent'}
+                onChange={(e) => setSort(e.target.value as LibrarySort)}
+                className="text-[11px] bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none text-gray-200 disabled:opacity-70"
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <span className="ml-auto text-[10px] text-gray-500 tabular-nums">
+                {loading ? '…' : `${list.length}/${total}`}
+              </span>
+            </div>
+          )}
+
           <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-800/40 divide-y divide-gray-800/40">
-            {list.length === 0 && <div className="p-4 text-center text-xs text-gray-500">No matches.</div>}
+            {list.length === 0 && !loading && <div className="p-4 text-center text-xs text-gray-500">No matches.</div>}
             {list.map((t) => (
               <TrackRow key={t.path} track={t} playlists={playlists}
                 onPlay={() => onPlay(t, list)}
@@ -172,6 +263,16 @@ export default function LibraryHome({
                 onEditTags={() => onEditTags(t)} />
             ))}
           </div>
+
+          {dbView && list.length < total && (
+            <button
+              onClick={() => { void fetchPage(false); }}
+              disabled={loading}
+              className="mt-2 w-full px-3 py-1.5 text-[11px] rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 text-gray-300 transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Loading…' : `Load more (${total - list.length} left)`}
+            </button>
+          )}
         </>
       )}
     </div>

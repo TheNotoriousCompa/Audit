@@ -11,6 +11,7 @@ Dependencies:
 - requests (for artwork download)
 """
 import logging
+import time
 from pathlib import Path
 from typing import Optional, Callable, Tuple, Any
 
@@ -77,6 +78,21 @@ def _extract_artist(info: dict) -> str:
 
     # 5. Last resort: return empty string
     return ''
+
+def _emit_saved(file_path: Path, progress_callback: Optional[Callable] = None, source_url: str = "") -> None:
+    """Emit a 'saved' event so the app can journal the download time."""
+    if not progress_callback:
+        return
+    try:
+        progress_callback({
+            "status": "saved",
+            "path": str(file_path),
+            "downloaded_at": int(time.time() * 1000),
+            "source_url": source_url or "",
+        })
+    except Exception:
+        pass
+
 
 def _process_metadata(file_path: Path, info: dict, progress_callback: Optional[Callable] = None):
     """Process metadata for a downloaded file."""
@@ -446,9 +462,15 @@ def download_media(
                             
                             _process_metadata(downloaded_file, entry, progress_callback)
                             # logger.info removed to avoid Unicode errors on Windows
-                            
+                             
                     except Exception as e:
                         logger.error(f"Error processing {downloaded_file}: {str(e)}", exc_info=True)
+                    # Journal the finalized playlist item (outside the mp3-only
+                    # branch so mp4 items are recorded too).
+                    try:
+                        _emit_saved(downloaded_file, progress_callback, entry.get('webpage_url', '') if isinstance(entry, dict) else '')
+                    except Exception:
+                        pass
                 
                 # Cleanup playlist residual thumbnails
                 # Check both playlist folder and root output folder
