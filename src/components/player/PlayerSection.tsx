@@ -10,6 +10,7 @@ import NowPlaying from './NowPlaying';
 import QueueView from './QueueView';
 import PlaylistsPanel from './PlaylistsPanel';
 import TagEditor from './TagEditor';
+import { invalidateArt } from './useArt';
 import {
   Playlist, loadPlaylists, savePlaylists, createPlaylist, resolvePlaylist,
 } from './playlists';
@@ -25,6 +26,7 @@ type View = 'player' | 'library' | 'folders' | 'playlists' | 'eq';
 
 const ROOTS_KEY = 'auditLibraryRoots';
 const LEGACY_ROOT_KEY = 'auditLibraryRoot';
+const AUTO_SCAN_MAX_AGE_MS = 30 * 60 * 1000;
 
 function shuffled<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -51,6 +53,9 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
   const transportRef = React.useRef<TransportControls | null>(null);
   const miniArtCache = React.useRef(new Map<string, string | null>());
+  const lastScanAt = React.useRef(0);
+  const lastSentArt = React.useRef<string | null>(null);
+  const lastSentArtPath = React.useRef<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -63,6 +68,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
         if (live && cache && (cache.tracks.length > 0 || cache.roots.length > 0)) {
           setRoots(cache.roots);
           setTracks(cache.tracks);
+          lastScanAt.current = Number(cache.scannedAt) || 0;
           fromCache = true;
         }
       } catch {
@@ -133,11 +139,15 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
     setScanError(null);
     try {
       const { tracks: all, error } = await runScan(targets);
-      if (error) setScanError(error);
+      if (error) {
+        setScanError(error);
+        return;
+      }
       setTracks(all);
       const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
       try {
         await api?.saveLibraryCache?.({ version: 1, roots: targets, scannedAt: Date.now(), tracks: all });
+        lastScanAt.current = Date.now();
       } catch {
         // cache is best-effort
       }
@@ -176,10 +186,15 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
       try {
         const { tracks: all, error } = await runScan(targets);
         if (!live) return;
-        if (error) setScanError(error);
+        if (error) {
+          setScanError(error);
+          onHarvestDone();
+          return;
+        }
         setTracks(all);
         try {
           await api?.saveLibraryCache?.({ version: 1, roots: targets, scannedAt: Date.now(), tracks: all });
+          lastScanAt.current = Date.now();
         } catch {
           // cache is best-effort
         }
@@ -210,6 +225,8 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
   useEffect(() => {
     if (autoRefreshDone.current || roots.length === 0) return;
     autoRefreshDone.current = true;
+    const age = Date.now() - lastScanAt.current;
+    if (lastScanAt.current > 0 && age < AUTO_SCAN_MAX_AGE_MS) return;
     void handleScan();
   }, [roots, handleScan]);
 
@@ -343,6 +360,14 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
   const queuePos = current ? `${queueIndex + 1} / ${queue.length}` : queue.length > 0 ? `${queue.length} in queue` : '';
 
   const handleTagSaved = useCallback((updated: Track) => {
+    invalidateArt(updated.path);
+    miniArtCache.current.delete(updated.path);
+    lastSentArt.current = null;
+    lastSentArtPath.current = null;
+    const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+    api?.getTrackArt?.(updated.path)
+      .then((r) => miniArtCache.current.set(updated.path, r && r.found ? r.dataUrl : null))
+      .catch(() => miniArtCache.current.set(updated.path, null));
     setTracks((ts) => ts.map((t) => (t.path === updated.path ? updated : t)));
     setQueue((q) => q.map((t) => (t.path === updated.path ? updated : t)));
     setEditingTrack(null);
@@ -373,12 +398,22 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
   }, [current?.path]);
 
   useEffect(() => {
+    let tick = 0;
     const id = setInterval(() => {
+      tick += 1;
       const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
       if (!api?.sendPlayerState) return;
       const dur = audioEl && isFinite(audioEl.duration) && audioEl.duration > 0
         ? audioEl.duration
         : current?.duration || 0;
+      const path = current?.path || null;
+      const art = path ? miniArtCache.current.get(path) ?? null : null;
+      const changed = path !== lastSentArtPath.current || art !== lastSentArt.current;
+      const includeArt = changed || tick % 5 === 0;
+      if (includeArt) {
+        lastSentArtPath.current = path;
+        lastSentArt.current = art;
+      }
       api.sendPlayerState({
         playing,
         title: current?.title || '',
@@ -387,8 +422,8 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
         dur,
         vol: volume,
         accent: lineColor,
-        art: (current?.path && miniArtCache.current.get(current.path)) || null,
-        artPath: current?.path || null,
+        art: includeArt ? art : null,
+        artPath: path,
         hasQueue: queue.length > 0,
       });
     }, 1000);

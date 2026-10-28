@@ -3,6 +3,7 @@ import path from 'path';
 import isDev from 'electron-is-dev';
 import serve from 'electron-serve';
 import { logToFile } from './logger';
+import { registerTrustedWindow } from './trust';
 
 let mainWindow: BrowserWindow | null = null;
 let loadURL: ReturnType<typeof serve> | null = null;
@@ -18,6 +19,18 @@ export function getPreloadPath(): string {
     preloadPath = path.join(__dirname, '..', '..', 'dist', 'preload', 'preload.js');
   } else {
     preloadPath = path.join(appRoot, 'dist', 'preload', 'preload.js');
+  }
+  if (!path.isAbsolute(preloadPath)) preloadPath = path.resolve(preloadPath);
+  return preloadPath;
+}
+
+export function getMiniPreloadPath(): string {
+  const appRoot = app.getAppPath();
+  let preloadPath: string;
+  if (isDev) {
+    preloadPath = path.join(__dirname, '..', '..', 'dist', 'preload', 'preload-mini.js');
+  } else {
+    preloadPath = path.join(appRoot, 'dist', 'preload', 'preload-mini.js');
   }
   if (!path.isAbsolute(preloadPath)) preloadPath = path.resolve(preloadPath);
   return preloadPath;
@@ -79,6 +92,8 @@ export function createWindow(): BrowserWindow {
       backgroundThrottling: false,
     },
   });
+
+  registerTrustedWindow(mainWindow, 'main');
 
   if (isDev) {
     loadMainContent(mainWindow);

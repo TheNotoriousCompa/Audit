@@ -1,11 +1,13 @@
 import * as fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
-import { app } from 'electron';
+import { app, nativeImage } from 'electron';
 import isDev from 'electron-is-dev';
 import { logToFile } from './logger';
 import type { LibraryCache, LibraryScanResult, Track, TrackArt, WriteTagFields, WriteTagResult } from '../types/electron';
-import { initDb, listTracks, upsertTracks, replaceRoots, getRoots, getMeta, setMeta, importLibraryCache } from './db';
+import { initDb, listTracks, upsertTracks, getRoots, getMeta, importLibraryCache, applyLibraryScan } from './db';
+import { isApprovedDirectory, isApprovedFile } from './approved-paths';
+import { normalizePathKey } from './path-policy';
+import { ART_TIMEOUT_MS, SCAN_TIMEOUT_MS, TAG_TIMEOUT_MS, runSidecar } from './sidecar-runner';
 
 const CACHE_VERSION = 1;
 
@@ -66,9 +68,7 @@ export function loadLibraryCache(): LibraryCache {
 export function saveLibraryCache(cache: LibraryCache): boolean {
   try {
     initDb();
-    upsertTracks(cache.tracks);
-    replaceRoots(cache.roots);
-    setMeta('scannedAt', String(Date.now()));
+    applyLibraryScan(cache);
     // Keep the JSON as a human-readable backup while both stores coexist.
     const payload: LibraryCache = {
       version: CACHE_VERSION,
@@ -102,171 +102,200 @@ function resolveScanInvocation(): { python: string; script: string } {
   };
 }
 
-export function scanLibrary(dir: string): Promise<LibraryScanResult> {
-  return new Promise((resolve) => {
-    const fail = (error: string): void => {
-      resolve({ success: false, root: dir, count: 0, tracks: [], error });
-    };
-
-    let statOk = false;
-    try {
-      statOk = fs.statSync(dir).isDirectory();
-    } catch {
-      statOk = false;
-    }
-    if (!statOk) return fail(`Not a directory: ${dir}`);
-
-    const { python, script } = resolveScanInvocation();
-    if (!fs.existsSync(script)) return fail(`Scanner script missing: ${script}`);
-
-    let proc;
-    try {
-      proc = spawn(python, [script, dir], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return fail(`Failed to start scanner: ${msg}`);
-    }
-
-    let stdout = '';
-    proc.stdout.on('data', (d: Buffer) => {
-      stdout += d.toString();
-    });
-    proc.stderr.on('data', (d: Buffer) => {
-      const line = d.toString().trim();
-      if (line) logToFile(`[LIB SCAN] ${line}`);
-    });
-    proc.on('error', (err) => {
-      logToFile(`[LIB SCAN SPAWN ERROR] ${err.message}`);
-      fail(`Failed to start scanner: ${err.message}`);
-    });
-    proc.on('close', (code) => {
-      for (const line of stdout.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('{')) continue;
-        try {
-          const parsed = JSON.parse(trimmed);
-          if (parsed.type === 'scan-result' && parsed.data) {
-            const data = parsed.data as LibraryScanResult;
-            return resolve({
-              success: Boolean(data.success),
-              root: String(data.root || dir),
-              count: Number(data.count || 0),
-              tracks: Array.isArray(data.tracks) ? data.tracks : [],
-              error: String(data.error || ''),
-            });
-          }
-        } catch {
-          // keep scanning lines
-        }
-      }
-      logToFile(`[LIB SCAN CLOSED] exit code: ${code}`);
-      fail(`Scanner exited with code ${code}`);
-    });
+export async function scanLibrary(dir: string): Promise<LibraryScanResult> {
+  const fail = (error: string): LibraryScanResult => ({
+    success: false, root: dir, count: 0, tracks: [], error,
   });
+
+  if (typeof dir !== 'string' || !isApprovedDirectory(dir, true)) {
+    return fail('Folder not approved. Choose it from the app first.');
+  }
+
+  let statOk = false;
+  try {
+    statOk = fs.statSync(dir).isDirectory();
+  } catch {
+    statOk = false;
+  }
+  if (!statOk) return fail(`Not a directory: ${dir}`);
+
+  const { python, script } = resolveScanInvocation();
+  if (!fs.existsSync(script)) return fail(`Scanner script missing: ${script}`);
+
+  const result = await runSidecar(python, [script, dir], SCAN_TIMEOUT_MS);
+  for (const line of result.stderr.split('\n')) {
+    if (line.trim()) logToFile(`[LIB SCAN] ${line.trim()}`);
+  }
+  if (result.error) {
+    logToFile(`[LIB SCAN ERROR] ${result.error}`);
+    return fail(result.error);
+  }
+
+  for (const line of result.lines) {
+    try {
+      const parsed = JSON.parse(line) as { type?: string; data?: LibraryScanResult };
+      if (parsed.type === 'scan-result' && parsed.data) {
+        const data = parsed.data;
+        return {
+          success: Boolean(data.success),
+          root: String(data.root || dir),
+          count: Number(data.count || 0),
+          tracks: Array.isArray(data.tracks) ? data.tracks : [],
+          error: String(data.error || ''),
+        };
+      }
+    } catch {
+      // Ignore non-JSON lines; stderr already carries human diagnostics.
+    }
+  }
+
+  logToFile(`[LIB SCAN CLOSED] exit code: ${result.code}`);
+  return fail(`Scanner exited with code ${result.code}`);
 }
 
 const EMPTY_ART: TrackArt = { found: false, mime: '', dataUrl: '', source: '', error: '' };
 
-export function writeTrackTags(filePath: string, fields: WriteTagFields): Promise<WriteTagResult> {
-  return new Promise((resolve) => {
-    const fail = (error: string): void => resolve({ success: false, track: null, error });
-    const { python, script } = resolveScanInvocation();
-    if (!fs.existsSync(script)) return fail('scanner missing');
+export async function writeTrackTags(filePath: string, fields: WriteTagFields): Promise<WriteTagResult> {
+  const fail = (error: string): WriteTagResult => ({ success: false, track: null, error });
+  if (!isApprovedFile(filePath)) return fail('File is outside the approved library folders');
+  const { python, script } = resolveScanInvocation();
+  if (!fs.existsSync(script)) return fail('scanner missing');
 
-    let proc;
+  const result = await runSidecar(
+    python,
+    [script, '--set-tag', filePath, JSON.stringify(fields)],
+    TAG_TIMEOUT_MS
+  );
+  for (const line of result.stderr.split('\n')) {
+    if (line.trim()) logToFile(`[LIB TAGS] ${line.trim()}`);
+  }
+  if (result.error) return fail(result.error);
+
+  for (const line of result.lines) {
     try {
-      proc = spawn(python, [script, '--set-tag', filePath, JSON.stringify(fields)], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
-      });
-    } catch (err) {
-      return fail(`Failed to start tag writer: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    let stdout = '';
-    proc.stdout.on('data', (d: Buffer) => {
-      stdout += d.toString();
-    });
-    proc.stderr.on('data', (d: Buffer) => {
-      const line = d.toString().trim();
-      if (line) logToFile(`[LIB TAGS] ${line}`);
-    });
-    proc.on('error', (err) => fail(`Tag writer failed: ${err.message}`));
-    proc.on('close', (code) => {
-      for (const line of stdout.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('{')) continue;
-        try {
-          const parsed = JSON.parse(trimmed);
-          if (parsed.type === 'tag-result' && parsed.data) {
-            const d = parsed.data;
-            const t = d.track as Partial<Track> | null;
-            logToFile(`[LIB TAGS] ${filePath.split(/[/\\]/).pop()} -> success=${Boolean(d.success)} err=${String(d.error || '')}`);
-            return resolve({
-              success: Boolean(d.success),
-              track: t && typeof t.path === 'string' ? (t as Track) : null,
-              error: String(d.error || ''),
-            });
+      const parsed = JSON.parse(line) as { type?: string; data?: Record<string, unknown> };
+      if (parsed.type === 'tag-result' && parsed.data) {
+        const d = parsed.data;
+        const track = d.track as Partial<Track> | null;
+        const updated = track && typeof track.path === 'string' ? (track as Track) : null;
+        logToFile(`[LIB TAGS] ${path.basename(filePath)} -> success=${Boolean(d.success)} err=${String(d.error || '')}`);
+        if (d.success && updated) {
+          try {
+            upsertTracks([updated]);
+            invalidateTrackArt(filePath);
+          } catch (err) {
+            logToFile(`[DB] tag upsert failed: ${err instanceof Error ? err.message : String(err)}`);
           }
-        } catch {
-          // keep scanning lines
         }
+        return {
+          success: Boolean(d.success),
+          track: updated,
+          error: String(d.error || ''),
+        };
       }
-      fail(`Tag writer exited with code ${code}`);
-    });
-  });
+    } catch {
+      // Ignore non-JSON lines.
+    }
+  }
+
+  return fail(`Tag writer exited with code ${result.code}`);
+}
+
+const ART_CACHE_LIMIT = 300;
+const artCache = new Map<string, TrackArt>();
+const artInFlight = new Map<string, Promise<TrackArt>>();
+
+export function invalidateTrackArt(filePath: string): void {
+  artCache.delete(normalizePathKey(filePath));
+}
+
+function rememberArt(key: string, art: TrackArt): TrackArt {
+  artCache.delete(key);
+  artCache.set(key, art);
+  if (artCache.size > ART_CACHE_LIMIT) {
+    const oldest = artCache.keys().next().value;
+    if (oldest) artCache.delete(oldest);
+  }
+  return art;
+}
+
+function shrinkArtwork(art: TrackArt): TrackArt {
+  if (!art.found || !art.dataUrl) return art;
+  const comma = art.dataUrl.indexOf(',');
+  if (comma < 0) return art;
+  try {
+    const buffer = Buffer.from(art.dataUrl.slice(comma + 1), 'base64');
+    if (buffer.length <= 200_000) return art;
+    const image = nativeImage.createFromBuffer(buffer);
+    if (image.isEmpty()) return art;
+    const size = image.getSize();
+    const width = Math.min(256, size.width || 256);
+    const resized = image.resize({ width, quality: 'good' });
+    if (resized.isEmpty()) return art;
+    const jpeg = resized.toJPEG(82);
+    if (!jpeg || jpeg.length === 0) return art;
+    return {
+      ...art,
+      mime: 'image/jpeg',
+      dataUrl: `data:image/jpeg;base64,${jpeg.toString('base64')}`,
+    };
+  } catch {
+    return art;
+  }
+}
+
+async function getTrackArtRaw(filePath: string): Promise<TrackArt> {
+  const { python, script } = resolveScanInvocation();
+  if (!fs.existsSync(script)) return { ...EMPTY_ART, error: 'scanner missing' };
+
+  const result = await runSidecar(python, [script, '--art', filePath], ART_TIMEOUT_MS);
+  if (result.error) {
+    logToFile(`[LIB ART] ${path.basename(filePath)} -> ${result.error}`);
+    return { ...EMPTY_ART, error: result.error };
+  }
+
+  for (const line of result.lines) {
+    try {
+      const parsed = JSON.parse(line) as { type?: string; data?: Record<string, unknown> };
+      if (parsed.type === 'art-result' && parsed.data) {
+        const d = parsed.data;
+        const src = String(d.source || '');
+        const art: TrackArt = {
+          found: Boolean(d.found),
+          mime: String(d.mime || ''),
+          dataUrl: String(d.data_url || ''),
+          source: src === 'embedded' || src === 'folder' ? src : '',
+          error: String(d.error || ''),
+        };
+        const shrunk = shrinkArtwork(art);
+        logToFile(`[LIB ART] ${path.basename(filePath)} -> found=${shrunk.found} source=${shrunk.source} bytes=${shrunk.dataUrl.length}`);
+        return shrunk;
+      }
+    } catch {
+      // Ignore non-JSON lines.
+    }
+  }
+
+  return { ...EMPTY_ART, error: 'no art data' };
 }
 
 export function getTrackArt(filePath: string): Promise<TrackArt> {
-  return new Promise((resolve) => {
-    const { python, script } = resolveScanInvocation();
-    if (!fs.existsSync(script)) return resolve({ ...EMPTY_ART, error: 'scanner missing' });
+  if (!isApprovedFile(filePath)) {
+    return Promise.resolve({ ...EMPTY_ART, error: 'File is outside the approved library folders' });
+  }
+  const key = normalizePathKey(filePath);
+  const cached = artCache.get(key);
+  if (cached) {
+    artCache.delete(key);
+    artCache.set(key, cached);
+    return Promise.resolve(cached);
+  }
+  const pending = artInFlight.get(key);
+  if (pending) return pending;
 
-    let proc;
-    try {
-      proc = spawn(python, [script, '--art', filePath], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return resolve({ ...EMPTY_ART, error: msg });
-    }
-
-    let stdout = '';
-    proc.stdout.on('data', (d: Buffer) => {
-      stdout += d.toString();
-    });
-    proc.on('error', () => resolve({ ...EMPTY_ART, error: 'spawn failed' }));
-    proc.on('close', () => {
-      let outcome = 'no art data';
-      for (const line of stdout.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('{')) continue;
-        try {
-          const parsed = JSON.parse(trimmed);
-          if (parsed.type === 'art-result' && parsed.data) {
-            const d = parsed.data;
-            const src = String(d.source || '');
-            outcome = `found=${Boolean(d.found)} source=${src} bytes=${String(d.data_url || '').length} err=${String(d.error || '')}`;
-            logToFile(`[LIB ART] ${filePath.split(/[/\\]/).pop()} -> ${outcome}`);
-            return resolve({
-              found: Boolean(d.found),
-              mime: String(d.mime || ''),
-              dataUrl: String(d.data_url || ''),
-              source: src === 'embedded' || src === 'folder' ? src : '',
-              error: String(d.error || ''),
-            });
-          }
-        } catch {
-          // keep scanning lines
-        }
-      }
-      logToFile(`[LIB ART] ${filePath.split(/[/\\]/).pop()} -> ${outcome}`);
-      resolve({ ...EMPTY_ART, error: 'no art data' });
-    });
-  });
+  const request = getTrackArtRaw(filePath)
+    .then((art) => rememberArt(key, art))
+    .finally(() => artInFlight.delete(key));
+  artInFlight.set(key, request);
+  return request;
 }

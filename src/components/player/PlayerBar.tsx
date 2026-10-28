@@ -67,7 +67,16 @@ export default function PlayerBar({ queue, queueIndex, onAdvance, onAudioReady, 
   // Load + autoplay on track change.
   useEffect(() => {
     const el = audioRef.current;
-    if (!el || !current) return;
+    if (!el) return;
+    if (!current) {
+      el.pause();
+      el.removeAttribute('src');
+      el.load();
+      setPlaying(false);
+      setPos(0);
+      setDur(0);
+      return;
+    }
     el.src = src;
     el.load();
     eqEngine.resume();

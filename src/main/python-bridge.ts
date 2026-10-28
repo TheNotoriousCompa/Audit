@@ -5,6 +5,9 @@ import isDev from 'electron-is-dev';
 import { logToFile } from './logger';
 import { getMainWindow } from './window';
 import { recordDownload } from './db';
+import { isAllowedDownloadQuery } from './download-policy';
+import { isApprovedDirectory, isApprovedFile, rememberDownloadDir } from './approved-paths';
+import { killProcessTree, detachedOnUnix } from './process-tree';
 import type { DownloadOptions, DownloadResult, DownloadProgress, DownloadStatus } from '../types/electron';
 
 let currentPythonProcess: ChildProcessWithoutNullStreams | null = null;
@@ -96,17 +99,12 @@ function parseAndForwardProgressLine(line: string, label: string): boolean {
 
 export function stopDownload(): void {
   if (currentPythonProcess) {
-    currentPythonProcess.kill('SIGTERM');
+    killProcessTree(currentPythonProcess);
     currentPythonProcess = null;
-    sendProgressToRenderer({
+    sendProgressToRenderer(safeProgressData({
       status: 'cancelled',
       message: "Download fermato dall'utente",
-      percentage: 0,
-      downloaded: 0, total: 0, filename: '', currentFile: '',
-      speed: 0, speed_str: '', eta: 0, _percent_str: '', _speed_str: '', _eta_str: '',
-      isPlaylist: false, currentItem: 0, totalItems: 0, playlistName: '',
-      file_percent: 0, playlist_percent: 0,
-    });
+    }));
   }
 }
 
@@ -118,6 +116,37 @@ export function runDownload(url: string, options: DownloadOptions): Promise<Down
       resolved = true;
       resolve(result);
     };
+
+    const query = url.trim();
+    if (!isAllowedDownloadQuery(query)) {
+      return resolveOnce({
+        success: false,
+        error: 'Only YouTube links and search queries are supported',
+      });
+    }
+
+    const format = options.format ?? 'mp3';
+    if (!['mp3', 'mp4', 'm4a', 'flac', 'wav', 'opus', 'best'].includes(format)) {
+      return resolveOnce({ success: false, error: `Unsupported format: ${format}` });
+    }
+
+    if (!options.outputDir || !options.outputDir.trim()) {
+      return resolveOnce({ success: false, error: 'Choose an output folder first' });
+    }
+
+    const requestedOutputDir = path.resolve(options.outputDir);
+    if (!isApprovedDirectory(requestedOutputDir, false)) {
+      return resolveOnce({
+        success: false,
+        error: 'This output folder was not approved. Choose it again from the app.',
+      });
+    }
+
+    const approvedOutputDir = rememberDownloadDir(requestedOutputDir);
+    if (!approvedOutputDir) {
+      return resolveOnce({ success: false, error: 'The output folder is not accessible' });
+    }
+    const outputDir = approvedOutputDir;
 
     let scriptPath: string;
     let pythonExecutable: string;
@@ -137,13 +166,6 @@ export function runDownload(url: string, options: DownloadOptions): Promise<Down
     console.log('Running Python script:', scriptPath);
     console.log('Using Python:', pythonExecutable);
 
-    let outputDir: string;
-    if (options.outputDir) {
-      outputDir = path.resolve(options.outputDir);
-    } else {
-      outputDir = process.cwd();
-    }
-
     try {
       fs.mkdirSync(outputDir, { recursive: true });
       const testFile = path.join(outputDir, '.write-test');
@@ -156,30 +178,51 @@ export function runDownload(url: string, options: DownloadOptions): Promise<Down
 
     const args = [
       scriptPath,
-      url,
+      query,
       outputDir,
     ];
 
-    if (options.format) args.push('--format', options.format);
+    args.push('--format', format);
     if (options.quality) args.push('--quality', options.quality);
     if (options.processPlaylist) args.push('--process-playlist');
     if (options.timeout) args.push('--timeout', String(options.timeout));
     if (options.fps) args.push('--fps', String(options.fps));
+    if (options.skipExisting) args.push('--skip-existing');
 
     console.log('Running command:', pythonExecutable, args.join(' '));
 
     const proc = spawn(pythonExecutable, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+      detached: detachedOnUnix(),
       env: {
         ...process.env,
         PYTHONIOENCODING: 'utf-8',
         PYTHONUTF8: '1',
+        AUDIT_PACKAGED: isDev ? '0' : '1',
       },
     }) as ChildProcessWithoutNullStreams;
 
     currentPythonProcess = proc;
 
+    const timeoutMs = Math.max(60, Number(options.timeout) || 300) * 1000;
+    let timeoutTimer: NodeJS.Timeout | null = null;
+    const armWatchdog = () => {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      timeoutTimer = setTimeout(() => {
+        logToFile(`[PYTHON TIMEOUT] no progress for ${timeoutMs}ms`);
+        killProcessTree(proc);
+        sendProgressToRenderer(safeProgressData({
+          status: 'error',
+          message: 'Download timed out',
+        }));
+        resolveOnce({ success: false, error: 'Download timed out' });
+      }, timeoutMs);
+    };
+    armWatchdog();
+
     proc.on('error', (err) => {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
       logToFile(`[PYTHON SPAWN ERROR] ${err.stack || err.message}`);
       resolveOnce({ success: false, error: `Failed to start python process: ${err.message}` });
     });
@@ -187,6 +230,7 @@ export function runDownload(url: string, options: DownloadOptions): Promise<Down
     let stdoutBuffer = '';
 
     proc.stdout.on('data', (data: Buffer) => {
+      armWatchdog();
       const output = data.toString();
       if (!output) return;
       stdoutBuffer += output;
@@ -209,10 +253,13 @@ export function runDownload(url: string, options: DownloadOptions): Promise<Down
             // keep it out of the UI progress stream.
             if (String(parsed.data.status) === 'saved' && parsed.data.path) {
               try {
-                recordDownload(
-                  String(parsed.data.path),
-                  parsed.data.source_url ? String(parsed.data.source_url) : undefined
-                );
+                const savedPath = String(parsed.data.path);
+                if (isApprovedFile(savedPath)) {
+                  recordDownload(
+                    savedPath,
+                    parsed.data.source_url ? String(parsed.data.source_url) : undefined
+                  );
+                }
               } catch {
                 // journal is best-effort
               }
@@ -220,10 +267,11 @@ export function runDownload(url: string, options: DownloadOptions): Promise<Down
               sendProgressToRenderer(safeProgressData(parsed.data));
             }
           } else if (parsed.type === 'result' && parsed.data) {
+            if (timeoutTimer) clearTimeout(timeoutTimer);
             const outputPath = String(parsed.data.output_path || '');
             if (Boolean(parsed.data.success) && outputPath) {
               try {
-                if (fs.existsSync(outputPath) && fs.statSync(outputPath).isFile()) {
+                if (fs.existsSync(outputPath) && fs.statSync(outputPath).isFile() && isApprovedFile(outputPath)) {
                   recordDownload(outputPath);
                 }
               } catch {
@@ -245,6 +293,7 @@ export function runDownload(url: string, options: DownloadOptions): Promise<Down
     });
 
     proc.stderr.on('data', (data: Buffer) => {
+      armWatchdog();
       const output = data.toString().trim();
       if (!output) return;
       for (const line of output.split('\n')) {
@@ -260,6 +309,7 @@ export function runDownload(url: string, options: DownloadOptions): Promise<Down
     });
 
     proc.on('close', (code) => {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
       currentPythonProcess = null;
       logToFile(`[PYTHON PROCESS CLOSED] exit code: ${code}`);
       if (resolved) return;

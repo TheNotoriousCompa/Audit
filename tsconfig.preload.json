@@ -8,6 +8,6 @@
     "lib": ["ES2022", "DOM"],
     "sourceMap": true
   },
-  "include": ["src/main/preload.ts"],
+  "include": ["src/main/preload.ts", "src/main/preload-mini.ts"],
   "exclude": ["node_modules", "dist", "src/main/main.ts"]
 }

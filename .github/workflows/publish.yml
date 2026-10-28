@@ -24,6 +24,20 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Verify Tag Matches Package Version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          if ("${{ github.ref_name }}" -ne "v$version") {
+            throw "Tag ${{ github.ref_name }} does not match package version v$version"
+          }
+
+      - name: Typecheck, Lint and Test
+        run: npm run verify
+
+      - name: Audit Production Dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Publish Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

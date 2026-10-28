@@ -50,6 +50,19 @@ def sanitize_filename(filename: str) -> str:
         
     return filename
 
+def unique_path(path: Path) -> Path:
+    """Return a non-existing path, adding " (n)" before the suffix if needed."""
+    if not path.exists():
+        return path
+    stem = path.stem
+    suffix = path.suffix
+    for index in range(2, 1000):
+        candidate = path.with_name(f"{stem} ({index}){suffix}")
+        if not candidate.exists():
+            return candidate
+    raise OSError(f"Cannot find a free filename for {path}")
+
+
 def parse_eta_to_seconds(eta_str: str) -> int:
     """Convert ETA string (HH:MM:SS or MM:SS) to seconds."""
     if not eta_str or eta_str == 'N/A':
@@ -90,11 +103,30 @@ def clean_youtube_url(url: str) -> str:
     return url
 
 def update_ytdlp():
-    """Updates yt-dlp to the latest version using pip (fast/silent when already up-to-date)."""
+    """Updates yt-dlp to the latest version using pip when available."""
+    # Packaged runtimes ship without pip: never spend the 45s timeout on a
+    # command that cannot work. The app update is the supported path there.
+    if os.environ.get("AUDIT_PACKAGED") == "1":
+        logger.info("Skipping yt-dlp update in packaged runtime")
+        return False
+
     # Skip update if explicitly disabled via environment variable
     if os.environ.get("SKIP_YTDLP_UPDATE") == "1":
         logger.info("Skipping yt-dlp update (SKIP_YTDLP_UPDATE is set)")
         return True
+
+    try:
+        probe = subprocess.run(
+            [sys.executable, "-m", "pip", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if probe.returncode != 0:
+            logger.info("pip is not available; keeping bundled yt-dlp")
+            return False
+    except Exception:
+        return False
 
     try:
         logger.info("Checking for yt-dlp updates...")

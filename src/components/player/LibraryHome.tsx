@@ -83,6 +83,7 @@ export default function LibraryHome({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const offsetRef = useRef(0);
+  const requestIdRef = useRef(0);
 
   // Views backed by SQLite (sort + pagination). Groups stay in-memory for now.
   const dbView = cat === 'all' || cat === 'recent';
@@ -119,7 +120,7 @@ export default function LibraryHome({
       !q || `${t.title} ${t.artist} ${t.album} ${t.genre} ${t.genre_guess} ${t.filename}`.toLowerCase().includes(q);
     if (group) return (groups?.find((g) => g.name === group)?.items || []).filter(match);
     return [];
-  }, [cat, group, groups, tracks, filter]);
+  }, [cat, group, groups, filter]);
 
   const fetchPage = useCallback(async (reset: boolean) => {
     const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
@@ -139,6 +140,7 @@ export default function LibraryHome({
       setTotal(sorted.length);
       return;
     }
+    const requestId = ++requestIdRef.current;
     const offset = reset ? 0 : offsetRef.current;
     setLoading(true);
     try {
@@ -148,13 +150,26 @@ export default function LibraryHome({
         limit: PAGE_SIZE,
         offset,
       });
+      if (requestId !== requestIdRef.current) return;
       offsetRef.current = offset + res.items.length;
       setItems((prev) => (reset ? res.items : [...prev, ...res.items]));
       setTotal(res.total);
+    } catch (err) {
+      if (requestId === requestIdRef.current) {
+        console.error('Library query failed:', err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [effectiveSort, filter, tracks]);
+
+  useEffect(() => {
+    if (!dbView) {
+      offsetRef.current = 0;
+      requestIdRef.current += 1;
+      setTotal(0);
+    }
+  }, [dbView, cat]);
 
   useEffect(() => {
     if (!dbView) return;
@@ -168,6 +183,30 @@ export default function LibraryHome({
   }, [sort]);
 
   const list = dbView ? items : groupedList;
+  const headerCount = dbView ? total : cat && group ? groupedList.length : tracks.length;
+
+  const playFromRow = useCallback(async (track: Track, fallback: Track[]) => {
+    if (!dbView) {
+      onPlay(track, fallback);
+      return;
+    }
+    const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+    try {
+      const res = await api?.libraryQuery?.({
+        sort: effectiveSort,
+        filter: filter.trim() || undefined,
+        limit: 5000,
+        offset: 0,
+      });
+      if (res && res.items.length > 0) {
+        onPlay(track, res.items);
+        return;
+      }
+    } catch (err) {
+      console.error('Library context query failed:', err);
+    }
+    onPlay(track, fallback);
+  }, [dbView, effectiveSort, filter, onPlay]);
 
   const open = (kind: CategoryKind) => {
     setCat(kind);
@@ -190,7 +229,7 @@ export default function LibraryHome({
         )}
         <div className="text-sm text-gray-200 font-medium">
           {!cat ? 'Library' : group || tiles.find((t) => t.kind === cat)?.label}
-          <span className="text-gray-500 font-normal"> · {total || tracks.length} songs</span>
+          <span className="text-gray-500 font-normal"> · {headerCount} songs</span>
         </div>
       </div>
 
@@ -253,7 +292,7 @@ export default function LibraryHome({
             {list.length === 0 && !loading && <div className="p-4 text-center text-xs text-gray-500">No matches.</div>}
             {list.map((t) => (
               <TrackRow key={t.path} track={t} playlists={playlists}
-                onPlay={() => onPlay(t, list)}
+                onPlay={() => { void playFromRow(t, list); }}
                 onPlayNext={() => onPlayNext(t)}
                 onAddToQueue={() => onAddToQueue(t)}
                 onAddToPlaylist={(id) => onAddToPlaylist(id, t)}

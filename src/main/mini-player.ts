@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain, screen } from 'electron';
 import { getMainWindow } from './window';
 import { logToFile } from './logger';
+import { isTrustedSender, registerTrustedWindow } from './trust';
 import type { MiniCommand } from '../types/electron';
 
 let miniWindow: BrowserWindow | null = null;
@@ -90,6 +91,7 @@ export function ensureMiniPlayer(): BrowserWindow | null {
         additionalArguments: ['--audit-mini'],
       },
     });
+    registerTrustedWindow(miniWindow, 'mini');
     if (loadMiniContent) loadMiniContent(miniWindow);
     else logToFile('[MINI] no loader set; mini window created without content');
 
@@ -147,18 +149,21 @@ export function setupMinimizeToMini(mainWindow: BrowserWindow, onFirstHide?: () 
 
 /** Wire remote-control forwarding between main and mini renderers. */
 export function registerMiniIpc(): void {
-  ipcMain.on('mini:control', (_event, cmd: MiniCommand) => {
+  ipcMain.on('mini:control', (event, cmd: MiniCommand) => {
+    if (!isTrustedSender(event.sender.id, true)) return;
     const main = getMainWindow();
     if (main && !main.isDestroyed()) {
       main.webContents.send('mini:command', cmd);
     }
   });
-  ipcMain.on('player:state', (_event, state: unknown) => {
+  ipcMain.on('player:state', (event, state: unknown) => {
+    if (!isTrustedSender(event.sender.id, false)) return;
     if (isMiniOpen()) {
       miniWindow?.webContents.send('player:state', state);
     }
   });
-  ipcMain.on('mini:expand', () => {
+  ipcMain.on('mini:expand', (event) => {
+    if (!isTrustedSender(event.sender.id, true)) return;
     const main = getMainWindow();
     if (main && !main.isDestroyed()) {
       if (main.isMinimized()) main.restore();
@@ -167,7 +172,8 @@ export function registerMiniIpc(): void {
     }
     hideMiniPlayer();
   });
-  ipcMain.on('mini:close', () => {
+  ipcMain.on('mini:close', (event) => {
+    if (!isTrustedSender(event.sender.id, true)) return;
     // Closing the mini player brings the app back instead of leaving it
     // hidden with no visible window.
     const main = getMainWindow();
@@ -178,13 +184,16 @@ export function registerMiniIpc(): void {
     }
     hideMiniPlayer();
   });
-  ipcMain.on('mini:toggle', () => {
+  ipcMain.on('mini:toggle', (event) => {
+    if (!isTrustedSender(event.sender.id, true)) return;
     toggleMiniPlayer();
   });
   ipcMain.on('mini:query', (event) => {
+    if (!isTrustedSender(event.sender.id, true)) return;
     event.sender.send('mini:state', { open: isMiniVisible() });
   });
-  ipcMain.on('mini:show', () => {
+  ipcMain.on('mini:show', (event) => {
+    if (!isTrustedSender(event.sender.id, true)) return;
     ensureMiniPlayer();
     notifyMain();
   });

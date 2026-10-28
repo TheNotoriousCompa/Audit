@@ -46,7 +46,14 @@ export default function MiniView() {
 
   useEffect(() => {
     const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
-    api?.onPlayerState?.((s) => setState(s));
+    api?.onPlayerState?.((s) => {
+      setState((prev) => {
+        if (prev && s.artPath === prev.artPath && !s.art) {
+          return { ...s, art: prev.art };
+        }
+        return s;
+      });
+    });
   }, []);
 
   const api = typeof window !== 'undefined' ? window.electronAPI : undefined;

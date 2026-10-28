@@ -1,4 +1,4 @@
-"""
+r"""
 Command line argument parsing for the YouTube to MP3 downloader.
 
 This module handles the parsing of command line arguments and JSON input from the Electron frontend.
@@ -85,6 +85,12 @@ def parse_arguments(args: Optional[List[str]] = None) -> Dict[str, Any]:
         action="store_true",
         help="Process all videos in the playlist"
     )
+
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Do not overwrite files that already exist"
+    )
     
     parser.add_argument(
         "--timeout",
@@ -132,6 +138,7 @@ def parse_arguments(args: Optional[List[str]] = None) -> Dict[str, Any]:
         'fps': parsed_args.fps,
         'batch_file': Path(parsed_args.batch) if parsed_args.batch else None,
         'process_playlist': parsed_args.process_playlist,
+        'skip_existing': parsed_args.skip_existing,
         'timeout': parsed_args.timeout,
         'max_retries': parsed_args.max_retries,
         'log_level': parsed_args.log_level,

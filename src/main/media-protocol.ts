@@ -1,6 +1,7 @@
 import { protocol } from 'electron';
 import * as fs from 'fs';
 import path from 'path';
+import { isApprovedFile } from './approved-paths';
 
 const MIME_BY_EXT: Record<string, string> = {
   '.mp3': 'audio/mpeg',
@@ -46,6 +47,7 @@ export function handleMediaProtocol(): void {
       const ext = path.extname(abs).toLowerCase();
       const mime = MIME_BY_EXT[ext];
       if (!mime) return new Response('unsupported type', { status: 415 });
+      if (!isApprovedFile(abs)) return new Response('forbidden', { status: 403 });
 
       const stat = fs.statSync(abs);
       if (!stat.isFile()) return new Response('not found', { status: 404 });

@@ -66,6 +66,7 @@ def main() -> None:
                 quality=args.get('quality', 'best'),
                 fps=args.get('fps'),
                 process_playlist=args.get('process_playlist', False),
+                skip_existing=args.get('skip_existing', True),
                 progress_callback=progress_reporter,
                 max_retries=args.get('max_retries', 3),
                 timeout=args.get('timeout', 300)
@@ -84,6 +85,7 @@ def main() -> None:
                 quality=args.get('quality', 'best'),
                 fps=args.get('fps'),
                 process_playlist=args.get('process_playlist', False),
+                skip_existing=args.get('skip_existing', True),
                 progress_callback=progress_reporter,
                 max_retries=args.get('max_retries', 3),
                 timeout=args.get('timeout', 300)
@@ -109,6 +111,7 @@ def process_single_url(
     quality: str = 'best',
     fps: Optional[int] = None,
     process_playlist: bool = False,
+    skip_existing: bool = True,
     progress_callback: Optional[ProgressReporter] = None,
     max_retries: int = 3,
     timeout: int = 300
@@ -123,6 +126,7 @@ def process_single_url(
             quality=quality,
             fps=fps,
             process_playlist=process_playlist,
+            skip_existing=skip_existing,
             progress_callback=progress_callback,
             max_retries=max_retries,
             timeout=timeout
@@ -139,6 +143,7 @@ def process_batch_file(
     quality: str = 'best',
     fps: Optional[int] = None,
     process_playlist: bool = False,
+    skip_existing: bool = True,
     progress_callback: Optional[ProgressReporter] = None,
     max_retries: int = 3,
     timeout: int = 300
@@ -163,6 +168,7 @@ def process_batch_file(
                     quality=quality,
                     fps=fps,
                     process_playlist=process_playlist,
+                    skip_existing=skip_existing,
                     progress_callback=progress_callback,
                     max_retries=max_retries,
                     timeout=timeout

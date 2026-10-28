@@ -10,6 +10,7 @@ on stdout. Human logs go to stderr.
 """
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -227,82 +228,80 @@ def write_tags(path_str: str, fields: Dict[str, Any]) -> Dict[str, Any]:
     artist = str(fields.get("artist", "") or "")
     album = str(fields.get("album", "") or "")
     genre = str(fields.get("genre", "") or "")
+    ext = p.suffix.lower()
+    if ext not in (".mp3", ".m4a", ".mp4", ".flac", ".ogg", ".opus", ".wma"):
+        return {"success": False, "track": None, "error": f"write not supported for {ext}"}
+
+    temp = p.with_name(f".{p.stem}.audit-tmp{p.suffix}")
     try:
-        ext = p.suffix.lower()
+        shutil.copy2(p, temp)
         if ext == ".mp3":
             from mutagen.id3 import ID3, TIT2, TPE1, TALB, TCON  # type: ignore
             try:
-                tags = ID3(str(p))
+                tags = ID3(str(temp))
             except Exception:
                 tags = ID3()
-            if title:
-                tags.delall("TIT2")
-                tags.add(TIT2(encoding=3, text=title))
-            if artist:
-                tags.delall("TPE1")
-                tags.add(TPE1(encoding=3, text=artist))
-            if album:
-                tags.delall("TALB")
-                tags.add(TALB(encoding=3, text=album))
-            if genre:
-                tags.delall("TCON")
-                tags.add(TCON(encoding=3, text=genre))
-            tags.save(str(p), v2_version=3)
+            for frame, value in (("TIT2", title), ("TPE1", artist), ("TALB", album), ("TCON", genre)):
+                tags.delall(frame)
+                if value:
+                    cls = {"TIT2": TIT2, "TPE1": TPE1, "TALB": TALB, "TCON": TCON}[frame]
+                    tags.add(cls(encoding=3, text=value))
+            tags.save(str(temp), v2_version=3)
         elif ext in (".m4a", ".mp4"):
             from mutagen.mp4 import MP4  # type: ignore
-            audio = MP4(str(p))
+            audio = MP4(str(temp))
             tags = audio.tags
             if tags is None:
                 audio.add_tags()
                 tags = audio.tags
             assert tags is not None
-            if title:
-                tags["\xa9nam"] = [title]
-            if artist:
-                tags["\xa9ART"] = [artist]
-            if album:
-                tags["\xa9alb"] = [album]
-            if genre:
-                tags["\xa9gen"] = [genre]
+            for key, value in (("\xa9nam", title), ("\xa9ART", artist), ("\xa9alb", album), ("\xa9gen", genre)):
+                if value:
+                    tags[key] = [value]
+                elif key in tags:
+                    del tags[key]
             audio.save()
         elif ext in (".flac", ".ogg", ".opus"):
-            audio = MutagenFile(str(p), easy=True)
+            audio = MutagenFile(str(temp), easy=True)
             if audio is None:
                 raise ValueError("unsupported file")
-            if title:
-                audio["title"] = [title]
-            if artist:
-                audio["artist"] = [artist]
-            if album:
-                audio["album"] = [album]
-            if genre:
-                audio["genre"] = [genre]
+            for key, value in (("title", title), ("artist", artist), ("album", album), ("genre", genre)):
+                if value:
+                    audio[key] = [value]
+                elif key in audio:
+                    del audio[key]
             audio.save()
         elif ext == ".wma":
             from mutagen.asf import ASF  # type: ignore
             from mutagen.asf import ASFUnicodeAttribute  # type: ignore
-            audio = ASF(str(p))
-            if title:
-                audio["Title"] = ASFUnicodeAttribute(title)
-            if artist:
-                audio["Author"] = ASFUnicodeAttribute(artist)
-            if album:
-                audio["WM/AlbumTitle"] = ASFUnicodeAttribute(album)
-            if genre:
-                audio["WM/Genre"] = ASFUnicodeAttribute(genre)
+            audio = ASF(str(temp))
+            for key, value in (("Title", title), ("Author", artist), ("WM/AlbumTitle", album), ("WM/Genre", genre)):
+                if value:
+                    audio[key] = ASFUnicodeAttribute(value)
+                elif key in audio:
+                    del audio[key]
             audio.save()
-        else:
-            return {"success": False, "track": None,
-                    "error": f"write not supported for {ext}"}
+        os.replace(temp, p)
     except Exception as exc:
+        try:
+            temp.unlink(missing_ok=True)
+        except Exception:
+            pass
         return {"success": False, "track": None, "error": str(exc)}
+
     try:
         st = p.stat()
         tags = _read_tags(p)
-        return {"success": True, "track": {
+        track = {
             "path": str(p), "filename": p.name, "size": st.st_size,
             "mtime": st.st_mtime, "ext": p.suffix.lower().lstrip("."), **tags,
-        }, "error": ""}
+        }
+        try:
+            from library.genres import infer_tracks
+        except ImportError:  # pragma: no cover - direct script fallback
+            from genres import infer_tracks  # type: ignore
+        infer_tracks([track])
+        return {"success": True, "track": track, "error": ""}
     except Exception as exc:
         return {"success": False, "track": None, "error": str(exc)}
 

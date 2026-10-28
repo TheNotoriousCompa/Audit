@@ -94,8 +94,10 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
         downloaded_bytes = int(data.get('downloaded_bytes') or data.get('downloaded') or 0)
         total_bytes = int(data.get('total_bytes') or data.get('total') or 0)
         
-        # Get speed
-        speed_str = str(data.get('_speed_str') or data.get('speed') or '0 B/s')
+        # Get speed: keep numeric bytes/s separate from the display string.
+        raw_speed = data.get('speed')
+        speed_value = float(raw_speed) if isinstance(raw_speed, (int, float)) else 0.0
+        speed_str = str(data.get('_speed_str') or (f"{int(speed_value)} B/s" if speed_value else '0 B/s'))
         
         # Get current file name
         current_file = ''
@@ -120,7 +122,7 @@ def format_progress(data: Dict[str, Any]) -> Dict[str, Any]:
             'percentage': float(percentage),
             'downloaded': downloaded_bytes,
             'total': total_bytes,
-            'speed': speed_str,
+            'speed': speed_value,
             'eta': eta,
             'message': str(data.get('message', '')),
             '_percent_str': f"{percentage}%",

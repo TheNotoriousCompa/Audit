@@ -7,7 +7,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 def check_ffmpeg():
-    """
+    r"""
     Looks for FFmpeg in the following order:
     1. System PATH
     2. Bundled app folders (packaged/unpacked)

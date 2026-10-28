@@ -19,7 +19,7 @@ import yt_dlp
 
 # Importa le funzioni necessarie dai moduli locali
 from .postprocess import set_mp3_metadata, download_artwork
-from .utils import ensure_directory, sanitize_filename, update_ytdlp
+from .utils import ensure_directory, sanitize_filename, update_ytdlp, unique_path
 from .search import check_ffmpeg
 from .progress import reset_progress_state, set_playlist_info, calculate_progress
 
@@ -163,6 +163,8 @@ def _process_metadata(file_path: Path, info: dict, progress_callback: Optional[C
         logger.info(f"Album: {info.get('album', 'Not found')}, Album Artist: {album_artist}")
 
         # Process metadata with all available info
+        release_date = str(info.get('release_date') or '')
+        year = str(info.get('release_year') or (release_date[:4] if release_date else ''))
         set_mp3_metadata(
             file_path=file_path,
             title=title,
@@ -170,14 +172,13 @@ def _process_metadata(file_path: Path, info: dict, progress_callback: Optional[C
             album=info.get('album', ''),
             album_artist=album_artist,
             track_number=int(info.get('track_number', 0)) if info.get('track_number') else 0,
-            year=str(info.get('release_year') or info.get('release_date', '')[:4] if info.get('release_date') else ''),
+            year=year,
             genre=', '.join(info.get('genres', [])) if info.get('genres') else '',
             artwork=artwork,
             comment=f"Downloaded with yt-dlp from {info.get('webpage_url', '')}"
         )
     except Exception:
-        # Continue execution even if metadata processing fails
-        pass
+        logger.warning("Metadata processing failed", exc_info=True)
 
 def download_media(
     url: str,
@@ -187,6 +188,7 @@ def download_media(
     quality: str = "best",
     fps: Optional[int] = None,
     process_playlist: bool = False,
+    skip_existing: bool = True,
     progress_callback: Optional[Callable[[str, float], None]] = None,
     max_retries: int = 3,
     timeout: int = 300
@@ -197,12 +199,8 @@ def download_media(
     # Reset global progress state for each new download session
     reset_progress_state()
 
-    # Auto-update yt-dlp to avoid 403/format errors from outdated versions
-    if progress_callback:
-        progress_callback({"status": "info", "message": "Checking for yt-dlp updates..."})
-    update_ytdlp()
-
-    ensure_directory(output_dir)
+    if not ensure_directory(output_dir):
+        return False, None, f"Cannot write to output directory: {output_dir}"
 
     ffmpeg_path = check_ffmpeg()
     if not ffmpeg_path:
@@ -259,11 +257,16 @@ def download_media(
         "verbose": False,
         "no_warnings": True,
         "ignoreerrors": True,
-        "outtmpl": str(Path(output_dir) / f"%(title)s.%(ext)s"),
+        "outtmpl": str(Path(output_dir) / f"%(title)s [%(id)s].%(ext)s"),
         "noplaylist": not process_playlist,
         "progress_hooks": [progress_wrapper],
         "writethumbnail": True,  # Download thumbnail
         "postprocessors": [],
+        "socket_timeout": max(5, min(int(timeout or 300), 60)),
+        "retries": max(0, int(max_retries or 0)),
+        "fragment_retries": max(0, int(max_retries or 0)),
+        "extractor_retries": max(0, int(max_retries or 0)),
+        "overwrites": not skip_existing,
     }
     
     # Format selection logic
@@ -306,7 +309,7 @@ def download_media(
     else:
         # Audio logic - Simplified to find best audio available, since we convert anyway
         ydl_opts["format"] = "bestaudio/best"
-        ydl_opts["outtmpl"] = str(Path(output_dir) / f"%(title)s.{format}")  # Force the output extension
+        ydl_opts["outtmpl"] = str(Path(output_dir) / f"%(title)s [%(id)s].{format}")  # Force the output extension
     
     if ffmpeg_path:
         ydl_opts["ffmpeg_location"] = str(Path(ffmpeg_path).parent)
@@ -366,7 +369,7 @@ def download_media(
                 set_playlist_info(playlist_state['total_count'], playlist_title)
                 
                 # Aggiorna l'output template per salvare nella cartella della playlist
-                ydl_opts["outtmpl"] = str(playlist_folder / "%(title)s.%(ext)s")
+                ydl_opts["outtmpl"] = str(playlist_folder / "%(title)s [%(id)s].%(ext)s")
                 
                 if progress_callback:
                     progress_callback({
@@ -419,11 +422,13 @@ def download_media(
                     if not entry:
                         continue
                         
-                    # Get the downloaded file path
-                    if '_filename' in entry:
-                        downloaded_file = Path(entry['_filename'])
-                    elif 'requested_downloads' in entry and entry['requested_downloads']:
+                    # Get the downloaded file path. requested_downloads is the
+                    # post-processed path; _filename can still point at the
+                    # pre-conversion source.
+                    if 'requested_downloads' in entry and entry['requested_downloads']:
                         downloaded_file = Path(entry['requested_downloads'][0]['filepath'])
+                    elif '_filename' in entry:
+                        downloaded_file = Path(entry['_filename'])
                     else:
                         logger.warning(f"Could not determine file path for entry: {entry.get('title', 'Unknown')}")
                         continue
@@ -432,18 +437,16 @@ def download_media(
                         logger.warning(f"File not found: {downloaded_file}")
                         continue
                     
-                    # Rename the file using the video title
+                    # Rename the file using the video title, never overwriting
+                    # an existing file with a different name.
                     title = entry.get('title', 'Unknown Title')
                     new_name = sanitize_filename(title) + downloaded_file.suffix
                     new_path = downloaded_file.parent / new_name
                     
                     try:
-                        # If the target file exists, remove it first (but only if it's different from source)
-                        if new_path != downloaded_file and new_path.exists():
-                            new_path.unlink()
-                        
-                        # Rename the file
-                        downloaded_file.rename(new_path)
+                        if new_path != downloaded_file:
+                            new_path = unique_path(new_path)
+                            downloaded_file.rename(new_path)
                         downloaded_file = new_path
                         
                         # Process metadata and add cover art
@@ -472,32 +475,6 @@ def download_media(
                     except Exception:
                         pass
                 
-                # Cleanup playlist residual thumbnails
-                # Check both playlist folder and root output folder
-                folders_to_check = []
-                if playlist_folder and playlist_folder.exists():
-                    folders_to_check.append(playlist_folder)
-                if output_dir and Path(output_dir).exists():
-                        folders_to_check.append(Path(output_dir))
-
-                playlist_name_sanitized = sanitize_filename(info.get('title', ''))
-
-                for folder in folders_to_check:
-                    try:
-                        # Common extensions for thumbnails
-                        for ext in ['*.jpg', '*.jpeg', '*.png', '*.webp']:
-                            for thumb_file in folder.glob(ext):
-                                # If the filename looks like the playlist name, delete it
-                                if thumb_file.stem == playlist_name_sanitized:
-                                    try:
-                                        if thumb_file.exists():
-                                            thumb_file.unlink()
-                                            logger.info(f"Deleted playlist thumbnail: {thumb_file.name}")
-                                    except OSError:
-                                        pass
-                    except Exception as e:
-                        logger.warning(f"Failed to cleanup playlist thumbnails in {folder}: {e}")
-
             else:
                 # Singolo video
                 if 'requested_downloads' in info and info['requested_downloads']:
@@ -515,12 +492,16 @@ def download_media(
                                                      (hasattr(download_info, 'ext') and download_info.ext.lower() == 'mp3')):
                         _process_metadata(downloaded_file, info, progress_callback)
                     
-                    # Determina il nome finale del file
+                    # Determina il nome finale del file usando l'estensione
+                    # reale: se la conversione fallisce non rinominiamo un
+                    # contenitore in un formato diverso.
                     title = info.get('title', 'Unknown Title')
-                    ext = 'mp3' if format.lower() == 'mp3' else download_info.get('ext', format)
+                    actual_ext = downloaded_file.suffix.lower().lstrip('.')
+                    ext = actual_ext or ('mp3' if format.lower() == 'mp3' else format)
                     output_path = Path(output_dir) / f"{sanitize_filename(title)}.{ext}"
                     
-                    # Se il file è stato convertito, rinominalo
+                    # Se il file è stato convertito, rinominalo senza
+                    # sovrascrivere un file già presente.
                     if downloaded_file.exists():
                         try:
                             # Ensure the output directory exists
@@ -528,8 +509,7 @@ def download_media(
                             
                             # If the file is not already in the final location, move it
                             if downloaded_file != output_path:
-                                if output_path.exists():
-                                    output_path.unlink()
+                                output_path = unique_path(output_path)
                                 downloaded_file.rename(output_path)
                         except Exception:
                             # If moving fails, use the original downloaded file path

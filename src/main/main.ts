@@ -4,11 +4,11 @@ import isDev from 'electron-is-dev';
 const isSquirrelShim = Boolean(require('electron-squirrel-startup'));
 
 import { logToFile, setupCrashHandler } from './logger';
-import { initRenderer, createWindow, loadMainContent, getPreloadPath, getIconPath } from './window';
+import { initRenderer, createWindow, loadMainContent, getMiniPreloadPath, getIconPath } from './window';
 import { registerIPCHandlers } from './ipc-handlers';
 import { initAutoUpdater } from './auto-updater';
 import { registerMediaProtocolScheme, handleMediaProtocol } from './media-protocol';
-import { initDb } from './db';
+import { initDb, closeDb } from './db';
 import {
   registerMiniIpc, setupMinimizeToMini, setMiniLoader, setMiniPreload, armQuitBypass,
 } from './mini-player';
@@ -27,10 +27,14 @@ if (isSquirrelShim) {
   logToFile(`--- App Starting (isDev: ${isDev}) ---`);
 
   app.whenReady().then(() => {
-    initDb();
+    try {
+      initDb();
+    } catch (err) {
+      logToFile(`[DB] startup failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
     handleMediaProtocol();
     registerMiniIpc();
-    setMiniPreload(getPreloadPath());
+    setMiniPreload(getMiniPreloadPath());
     setMiniLoader((mini) => loadMainContent(mini, true));
     const win = createWindow();
     setupMinimizeToMini(win, () => showMiniHint());
@@ -53,5 +57,9 @@ if (isSquirrelShim) {
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
+  });
+
+  app.on('will-quit', () => {
+    closeDb();
   });
 }

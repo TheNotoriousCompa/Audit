@@ -125,7 +125,7 @@ ARTIST_SEEDS = {
     "daft punk": "Electronic", "crystal castles": "Electronic", "aphex twin": "Electronic",
     "bonobo": "Electronic", "four tet": "Electronic", "flume": "Electronic",
     "skrillex": "Dubstep", "excision": "Dubstep", "zeds dead": "Dubstep",
-    "fisher": "House", "daft punk": "House", "disclosure": "House",
+    "fisher": "House", "disclosure": "House",
     "gesaffelstein": "Techno", "amelie lens": "Techno", "charlotte de witte": "Techno",
     "carpenter brut": "Electronic", "perturbator": "Electronic", "m|o|o|n": "Electronic",
     # rock / metal / punk

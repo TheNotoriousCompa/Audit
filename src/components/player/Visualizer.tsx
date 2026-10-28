@@ -38,6 +38,8 @@ export default function Visualizer({ lineColor, height = 72 }: { lineColor: stri
     let raf = 0;
     let phase = 0;
     let data: Uint8Array<ArrayBuffer> | null = null;
+    let active = true;
+    let intersecting = true;
 
     const base = parseColor(lineColor);
     const mid = mix(base, [255, 255, 255], 0.18);
@@ -48,25 +50,48 @@ export default function Visualizer({ lineColor, height = 72 }: { lineColor: stri
 
     const canvas = canvasRef.current;
     let roRef: ResizeObserver | null = null;
+    let ioRef: IntersectionObserver | null = null;
     if (canvas) {
       const ro = new ResizeObserver((entries) => {
         widthRef.current = entries[0]?.contentRect.width ?? canvas.clientWidth;
+        if (!document.hidden && intersecting && !raf && widthRef.current > 0) draw();
       });
       ro.observe(canvas);
       widthRef.current = canvas.clientWidth;
       roRef = ro;
+
+      const io = new IntersectionObserver((entries) => {
+        intersecting = entries[0]?.isIntersecting ?? true;
+        if (!intersecting) {
+          if (raf) cancelAnimationFrame(raf);
+          raf = 0;
+        } else if (!document.hidden && !raf) {
+          draw();
+        }
+      }, { threshold: 0.01 });
+      io.observe(canvas);
+      ioRef = io;
     }
 
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+      } else if (intersecting && !raf) {
+        draw();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     const draw = () => {
+      raf = 0;
+      if (!active || document.hidden || !intersecting) return;
       const el = canvasRef.current;
       if (!el) return;
       const cssW = widthRef.current;
-      // Hidden sections report 0 width: keep the loop alive so the first
-      // visible frame draws immediately (it used to die here).
-      if (cssW <= 0) {
-        raf = requestAnimationFrame(draw);
-        return;
-      }
+      // Hidden sections report 0 width: keep waiting for the observer/resize
+      // signal instead of running a busy rAF loop.
+      if (cssW <= 0) return;
 
       // One art unit per BLOCK css px: crisp square pixels after scaling.
       const artW = Math.max(32, Math.round(cssW / BLOCK));
@@ -138,11 +163,14 @@ export default function Visualizer({ lineColor, height = 72 }: { lineColor: stri
       raf = requestAnimationFrame(draw);
     };
 
-    draw();
+    if (!document.hidden) draw();
 
     return () => {
-      cancelAnimationFrame(raf);
+      active = false;
+      if (raf) cancelAnimationFrame(raf);
       if (roRef) roRef.disconnect();
+      if (ioRef) ioRef.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [lineColor, height]);
 

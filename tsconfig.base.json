@@ -13,7 +13,7 @@
     "composite": false,
     "declaration": false,
     "declarationMap": false,
-    "noEmitOnError": false,
+    "noEmitOnError": true,
     "types": ["node", "electron"],
     "lib": ["ES2022", "DOM"]
   }
