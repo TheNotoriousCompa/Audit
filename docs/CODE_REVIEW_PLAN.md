@@ -1,6 +1,7 @@
-# Audit — Piano di esecuzione della Full-Project Code Review (v4)
+# Audit - Piano di esecuzione della Full-Project Code Review (v4)
 
-Stato: **solo pianificazione**. Nessun file di codice è stato modificato o eseguito per produrre questo piano.
+Stato: **eseguito il 2026-10-28**. I deliverable sono in `docs/review/`; il testo sotto resta il piano originale.
+Stato originale: **solo pianificazione**. Nessun file di codice è stato modificato o eseguito per produrre questo piano.
 
 ---
 
