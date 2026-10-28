@@ -42,6 +42,7 @@ try {
   db.recordDownload(a, 'https://youtu.be/x');
   assert.ok(db.getDownloadedAt(a));
   assert.equal(db.queryTracks({ sort: 'downloaded' }).items[0].path, a);
+  assert.equal(db.queryTracks({ downloadedOnly: true }).total, 1);
   db.applyLibraryScan({ version: 1, roots: [root], tracks: [track(a, 'A')] });
   assert.equal(db.queryTracks({}).total, 1);
   assert.equal(db.queryTracks({ filter: '***' }).total, 0);

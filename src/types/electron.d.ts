@@ -115,6 +115,8 @@ export interface LibraryQuery {
   filter?: string;
   /** Restrict to one canonical genre. */
   genre?: string;
+  /** Only tracks downloaded by Audit (downloaded_at is present). */
+  downloadedOnly?: boolean;
   limit?: number;
   offset?: number;
 }

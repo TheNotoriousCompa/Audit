@@ -91,3 +91,9 @@ Fuori dalle fasi 0-3, da affrontare nella fase 4:
 ## 7. Nota operativa
 
 `npm run build` fallisce se l'app Electron e' aperta, perche' better-sqlite3 e' caricato e il file nativo e' bloccato. Chiudere l'app prima della build. `npm run verify` non richiede la chiusura, ma esegue `build:main` e il test DB in un processo Electron separato.
+
+## 8. Fix successivi
+
+- `Recently downloaded` ora usa `downloadedOnly`: la vista mostra solo le tracce con `downloaded_at`, non l'intera libreria ordinata per mtime. Verificato: 1 traccia su 1406.
+- Il menu dei tre puntini di `TrackRow` e' renderizzato in un portal su `document.body`, con posizione fissa e `z-index: 1000`. Non viene piu' tagliato dai contenitori `overflow` della libreria; se la riga e' in basso, il menu si apre verso l'alto. Verificato con menu dentro il viewport e `elementFromPoint` sopra il menu.
+- Il sort scelto in `All Songs` non viene piu' sovrascritto aprendo `Recently downloaded`.

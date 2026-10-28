@@ -88,6 +88,7 @@ export default function LibraryHome({
   // Views backed by SQLite (sort + pagination). Groups stay in-memory for now.
   const dbView = cat === 'all' || cat === 'recent';
   const effectiveSort: LibrarySort = cat === 'recent' ? 'downloaded' : sort;
+  const downloadedOnly = cat === 'recent';
 
   const tiles = useMemo(() => {
     const artists = new Set(tracks.map((t) => normKey(t.artist || 'Unknown'))).size;
@@ -101,7 +102,7 @@ export default function LibraryHome({
       { kind: 'artists' as CategoryKind, label: 'Artists', count: artists, Icon: Users },
       { kind: 'albums' as CategoryKind, label: 'Albums', count: albums, Icon: Disc3 },
       { kind: 'genres' as CategoryKind, label: 'Genres', count: genres, Icon: Tags },
-      { kind: 'recent' as CategoryKind, label: 'Recently downloaded', count: downloaded || Math.min(50, tracks.length), Icon: Clock },
+      { kind: 'recent' as CategoryKind, label: 'Recently downloaded', count: downloaded, Icon: Clock },
     ];
   }, [tracks]);
 
@@ -129,13 +130,16 @@ export default function LibraryHome({
       const q = filter.trim().toLowerCase();
       const match = (t: Track) =>
         !q || `${t.title} ${t.artist} ${t.album} ${t.genre} ${t.genre_guess} ${t.filename}`.toLowerCase().includes(q);
-      const sorted = [...tracks].filter(match).sort((a, b) => {
-        if (effectiveSort === 'downloaded') return (b.downloaded_at ?? b.mtime) - (a.downloaded_at ?? a.mtime);
-        if (effectiveSort === 'artist') return a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title);
-        if (effectiveSort === 'album') return a.album.localeCompare(b.album) || a.title.localeCompare(b.title);
-        if (effectiveSort === 'duration') return b.duration - a.duration;
-        return a.title.localeCompare(b.title);
-      });
+      const sorted = [...tracks]
+        .filter((t) => !downloadedOnly || typeof t.downloaded_at === 'number')
+        .filter(match)
+        .sort((a, b) => {
+          if (effectiveSort === 'downloaded') return (b.downloaded_at ?? b.mtime) - (a.downloaded_at ?? a.mtime);
+          if (effectiveSort === 'artist') return a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title);
+          if (effectiveSort === 'album') return a.album.localeCompare(b.album) || a.title.localeCompare(b.title);
+          if (effectiveSort === 'duration') return b.duration - a.duration;
+          return a.title.localeCompare(b.title);
+        });
       setItems(sorted);
       setTotal(sorted.length);
       return;
@@ -147,6 +151,7 @@ export default function LibraryHome({
       const res = await api.libraryQuery({
         sort: effectiveSort,
         filter: filter.trim() || undefined,
+        downloadedOnly,
         limit: PAGE_SIZE,
         offset,
       });
@@ -161,7 +166,7 @@ export default function LibraryHome({
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [effectiveSort, filter, tracks]);
+  }, [effectiveSort, filter, tracks, downloadedOnly]);
 
   useEffect(() => {
     if (!dbView) {
@@ -195,6 +200,7 @@ export default function LibraryHome({
       const res = await api?.libraryQuery?.({
         sort: effectiveSort,
         filter: filter.trim() || undefined,
+        downloadedOnly,
         limit: 5000,
         offset: 0,
       });
@@ -206,13 +212,12 @@ export default function LibraryHome({
       console.error('Library context query failed:', err);
     }
     onPlay(track, fallback);
-  }, [dbView, effectiveSort, filter, onPlay]);
+  }, [dbView, effectiveSort, filter, downloadedOnly, onPlay]);
 
   const open = (kind: CategoryKind) => {
     setCat(kind);
     setGroup(null);
     setFilter('');
-    if (kind === 'recent') setSort('downloaded');
   };
   const back = () => {
     if (group) setGroup(null);

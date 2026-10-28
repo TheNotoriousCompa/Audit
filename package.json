@@ -21,7 +21,7 @@
     "build": "npm run clean && npm run build:main && npm run build:preload && npm run build:renderer && npm run postbuild",
     "clean": "rimraf dist",
     "clean:out": "rimraf out",
-    "clean:all": "rimraf dist out .next",
+    "clean:all": "rimraf dist out .next .next-dev",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.preload.json && tsc --noEmit --incremental false -p tsconfig.json",
     "lint": "eslint src tests",
     "test": "node --import tsx --test tests/index.test.ts",

@@ -73,6 +73,7 @@ Thumbs.db
 /build
 /out
 /.next/
+/.next-dev/
 
 # Electron-builder output
 /out/

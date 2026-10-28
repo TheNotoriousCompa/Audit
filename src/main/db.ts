@@ -376,6 +376,9 @@ export function queryTracks(options: LibraryQuery = {}): LibraryQueryResult {
 
   const base: string[] = ['t.missing_since IS NULL'];
   const baseParams: Record<string, unknown> = {};
+  if (options.downloadedOnly) {
+    base.push('t.downloaded_at IS NOT NULL');
+  }
   if (options.genre) {
     base.push('(t.genre_guess = @genre OR t.genre = @genre)');
     baseParams.genre = options.genre;

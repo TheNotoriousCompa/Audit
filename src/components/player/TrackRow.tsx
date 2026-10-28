@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FileMusic, Mic, MoreVertical, Play, ListPlus, ListVideo, ListPlus as QueueNext, Pencil } from 'lucide-react';
 import type { Track } from '@/types/electron';
 
@@ -32,19 +33,63 @@ export default function TrackRow({
 }: Props) {
   const [menu, setMenu] = useState(false);
   const [pickPl, setPickPl] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!menu) return;
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenu(false);
-        setPickPl(false);
-      }
+    const close = () => {
+      setMenu(false);
+      setPickPl(false);
     };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    const closeOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (anchorRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      close();
+    };
+    const closeOnScroll = (e: Event) => {
+      if (menuRef.current?.contains(e.target as Node)) return;
+      close();
+    };
+    const closeOnEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', closeOutside);
+    window.addEventListener('scroll', closeOnScroll, true);
+    window.addEventListener('resize', close);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOutside);
+      window.removeEventListener('scroll', closeOnScroll, true);
+      window.removeEventListener('resize', close);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
   }, [menu]);
+
+  const toggleMenu = () => {
+    if (menu) {
+      setMenu(false);
+      setPickPl(false);
+      return;
+    }
+    const button = buttonRef.current;
+    if (!button) return;
+    const rect = button.getBoundingClientRect();
+    const width = 192;
+    const margin = 8;
+    const estimatedHeight = 300;
+    const left = Math.max(margin, Math.min(window.innerWidth - width - margin, rect.right - width));
+    const opensUp = rect.bottom + estimatedHeight > window.innerHeight - margin;
+    setMenuPos(
+      opensUp
+        ? { left, bottom: window.innerHeight - rect.top + 4 }
+        : { left, top: rect.bottom + 4 }
+    );
+    setPickPl(false);
+    setMenu(true);
+  };
 
   const item =
     'w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs sm:text-sm text-gray-200 hover:bg-white/5 transition-colors';
@@ -71,45 +116,56 @@ export default function TrackRow({
         <span className="text-[11px] text-gray-500 tabular-nums shrink-0">{fmtDur(track.duration)}</span>
       </button>
       {trailing}
-      <div className="relative shrink-0" ref={menuRef}>
-        <button onClick={() => { setMenu((m) => !m); setPickPl(false); }} title="Track actions"
+      <div className="relative shrink-0" ref={anchorRef}>
+        <button ref={buttonRef} onClick={toggleMenu} title="Track actions"
           className="p-1.5 rounded-lg text-gray-400 acc-hover-text transition-colors">
           <MoreVertical className="w-4 h-4" />
         </button>
-        {menu && (
-          <div className="absolute right-0 top-full mt-1 w-48 z-30 bg-zinc-900 border border-gray-700/60 rounded-xl shadow-2xl overflow-hidden">
-            <button className={item} onClick={() => { setMenu(false); onPlay(); }}>
-              <Play className="w-3.5 h-3.5 acc-text" /> Play
-            </button>
-            <button className={item} onClick={() => { setMenu(false); onPlayNext(); }}>
-              <QueueNext className="w-3.5 h-3.5 text-gray-400" /> Play next
-            </button>
-            <button className={item} onClick={() => { setMenu(false); onAddToQueue(); }}>
-              <ListPlus className="w-3.5 h-3.5 text-gray-400" /> Add to queue
-            </button>
-            <button className={item} onClick={() => setPickPl((p) => !p)}>
-              <ListVideo className="w-3.5 h-3.5 text-gray-400" /> Add to playlist ▸
-            </button>
-            {onEditTags && (
-              <button className={item} onClick={() => { setMenu(false); onEditTags(); }}>
-                <Pencil className="w-3.5 h-3.5 text-gray-400" /> Edit tags
-              </button>
-            )}
-            {pickPl && (
-              <div className="border-t border-gray-700/60 max-h-32 overflow-y-auto">
-                {playlists.length === 0 && (
-                  <div className="px-3 py-1.5 text-[11px] text-gray-500">No playlists — create one in the Playlists tab.</div>
-                )}
-                {playlists.map((p) => (
-                  <button key={p.id} className={`${item} pl-5`} onClick={() => { setMenu(false); onAddToPlaylist(p.id); }}>
-                    <span className="truncate">{p.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
+      {menu && menuPos && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            left: menuPos.left,
+            top: menuPos.top,
+            bottom: menuPos.bottom,
+            zIndex: 1000,
+          }}
+          className="w-48 bg-zinc-900 border border-gray-700/60 rounded-xl shadow-2xl overflow-hidden"
+        >
+          <button className={item} onClick={() => { setMenu(false); onPlay(); }}>
+            <Play className="w-3.5 h-3.5 acc-text" /> Play
+          </button>
+          <button className={item} onClick={() => { setMenu(false); onPlayNext(); }}>
+            <QueueNext className="w-3.5 h-3.5 text-gray-400" /> Play next
+          </button>
+          <button className={item} onClick={() => { setMenu(false); onAddToQueue(); }}>
+            <ListPlus className="w-3.5 h-3.5 text-gray-400" /> Add to queue
+          </button>
+          <button className={item} onClick={() => setPickPl((p) => !p)}>
+            <ListVideo className="w-3.5 h-3.5 text-gray-400" /> Add to playlist ▸
+          </button>
+          {onEditTags && (
+            <button className={item} onClick={() => { setMenu(false); onEditTags(); }}>
+              <Pencil className="w-3.5 h-3.5 text-gray-400" /> Edit tags
+            </button>
+          )}
+          {pickPl && (
+            <div className="border-t border-gray-700/60 max-h-32 overflow-y-auto">
+              {playlists.length === 0 && (
+                <div className="px-3 py-1.5 text-[11px] text-gray-500">No playlists — create one in the Playlists tab.</div>
+              )}
+              {playlists.map((p) => (
+                <button key={p.id} className={`${item} pl-5`} onClick={() => { setMenu(false); onAddToPlaylist(p.id); }}>
+                  <span className="truncate">{p.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
