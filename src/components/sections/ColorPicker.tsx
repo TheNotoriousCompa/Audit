@@ -6,7 +6,7 @@ interface ColorPickerProps {
   onChange: (hex: string) => void;
 }
 
-const PRESETS = ['#50C878', '#38BDF8', '#A78BFA', '#F5B942', '#FB7185', '#E4E4E7'];
+const PRESETS = ['#ffffff', '#50C878', '#38BDF8', '#A78BFA', '#F5B942', '#FB7185'];
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 

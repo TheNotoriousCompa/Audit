@@ -22,7 +22,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
           disabled={loading || !url.trim()}
           className={`flex-1 py-3 px-6 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${loading || !url.trim()
               ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
-              : 'acc-bg acc-bg-hover text-white acc-shadow-hover transform hover:-translate-y-0.5'
+              : 'acc-bg acc-bg-hover acc-on-accent acc-shadow-hover transform hover:-translate-y-0.5'
             }`}
         >
           {loading ? (

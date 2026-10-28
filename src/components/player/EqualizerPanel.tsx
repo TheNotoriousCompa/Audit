@@ -83,7 +83,7 @@ export default function EqualizerPanel() {
             {EQ_PRESET_NAMES.map((n) => (
               <button key={n} onClick={() => applyPreset(n)}
                 className={`px-2 py-1 text-[11px] rounded-lg border transition-colors ${preset === n
-                  ? 'acc-soft-40 acc-border text-white'
+                  ? 'acc-soft-40 acc-border acc-on-accent'
                   : 'bg-black/30 border-gray-800/60 text-gray-300 acc-hover-text'}`}>
                 {n}
               </button>

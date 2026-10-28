@@ -45,6 +45,17 @@ function hasPlaylistParams(str: string): boolean {
     }
 }
 
+function accentContrast(hex: string): string {
+  const raw = (hex || '').replace('#', '');
+  const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return '#ffffff';
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return lum > 0.6 ? '#0b0b0d' : '#ffffff';
+}
+
 export default function Home() {
     const [url, setUrl] = useState("");
     const [outputFolder, setOutputFolder] = useState<string | null>(null);
@@ -64,7 +75,7 @@ export default function Home() {
     // localStorage in a useState initializer caused a hydration mismatch
     // ("This won't be patched up"), which froze tab/color updates. Defaults
     // are rendered, the saved values are applied after mount instead.
-    const DEFAULT_COLORS = { lineColor: '#50C878', backgroundColor: '#000000' };
+    const DEFAULT_COLORS = { lineColor: '#ffffff', backgroundColor: '#000000' };
     const [colors, setColors] = useState(DEFAULT_COLORS);
     const colorsLoaded = useRef(false);
 
@@ -75,8 +86,10 @@ export default function Home() {
             if (savedColors) {
                 const parsed = JSON.parse(savedColors) as { lineColor?: unknown; backgroundColor?: unknown };
                 if (parsed && typeof parsed.lineColor === 'string') {
+                    // Migrate the previous default accent to the new white one.
+                    const lineColor = parsed.lineColor.toLowerCase() === '#50c878' ? '#ffffff' : parsed.lineColor;
                     setColors({
-                        lineColor: parsed.lineColor,
+                        lineColor,
                         backgroundColor: typeof parsed.backgroundColor === 'string' ? parsed.backgroundColor : '#000000'
                     });
                 }
@@ -541,7 +554,7 @@ export default function Home() {
     return (
         <main
             className="relative h-screen overflow-hidden"
-            style={{ '--audit-accent': colors.lineColor } as React.CSSProperties}
+            style={{ '--audit-accent': colors.lineColor, '--audit-accent-contrast': accentContrast(colors.lineColor) } as React.CSSProperties}
         >
             {isMini ? (
                 <MiniView />
@@ -719,7 +732,7 @@ export default function Home() {
             )}
 
             <div className="relative z-10 h-screen overflow-y-auto">
-            <div className="flex flex-col items-center justify-center min-h-full p-4 pt-16">
+            <div className="flex flex-col items-center justify-start min-h-full p-4 pt-16 pb-8">
                 <div className="w-full max-w-3xl glass-base rounded-2xl p-4 sm:p-6 md:p-8 mx-2 sm:mx-4">
                     {/* Downloader / Library switch: sliding thumb, one clear state */}
                     <div className="relative grid grid-cols-2 gap-1 p-1 rounded-2xl glass-inset mb-5">
@@ -733,17 +746,17 @@ export default function Home() {
                         />
                         <button onClick={() => switchTab('download')}
                             className="relative z-10 flex items-center gap-2.5 px-3 py-2 rounded-xl text-left">
-                            <ArrowDownToLine className={`w-5 h-5 shrink-0 transition-colors ${tab === 'download' ? 'acc-text' : 'text-gray-500'}`} />
+                            <ArrowDownToLine className={`w-5 h-5 shrink-0 transition-colors ${tab === 'download' ? 'acc-on-accent' : 'text-gray-500'}`} />
                             <span className="min-w-0">
-                                <span className={`block text-xs sm:text-sm font-semibold transition-colors ${tab === 'download' ? 'text-white' : 'text-gray-300'}`}>Downloader</span>
+                                <span className={`block text-xs sm:text-sm font-semibold transition-colors ${tab === 'download' ? 'acc-on-accent' : 'text-gray-300'}`}>Downloader</span>
                                 <span className="block text-[10px] sm:text-[11px] text-gray-500 truncate">YouTube → audio files</span>
                             </span>
                         </button>
                         <button onClick={() => switchTab('library')}
                             className="relative z-10 flex items-center gap-2.5 px-3 py-2 rounded-xl text-left">
-                            <ListMusic className={`w-5 h-5 shrink-0 transition-colors ${tab === 'library' ? 'acc-text' : 'text-gray-500'}`} />
+                            <ListMusic className={`w-5 h-5 shrink-0 transition-colors ${tab === 'library' ? 'acc-on-accent' : 'text-gray-500'}`} />
                             <span className="min-w-0">
-                                <span className={`block text-xs sm:text-sm font-semibold transition-colors ${tab === 'library' ? 'text-white' : 'text-gray-300'}`}>Library & Player</span>
+                                <span className={`block text-xs sm:text-sm font-semibold transition-colors ${tab === 'library' ? 'acc-on-accent' : 'text-gray-300'}`}>Library & Player</span>
                                 <span className="block text-[10px] sm:text-[11px] text-gray-500 truncate">Your music, EQ, playlists</span>
                             </span>
                         </button>
@@ -857,7 +870,7 @@ export default function Home() {
                                     Open in Library
                                 </button>
                                 <button onClick={() => { setHarvest((h) => (h ? { ...h, autoplay: true } : h)); switchTab('library'); }}
-                                    className="flex-1 px-3 py-2.5 text-xs sm:text-sm font-medium acc-soft-40 acc-hover-60 border acc-border rounded-xl text-white transition-colors">
+                                    className="flex-1 px-3 py-2.5 text-xs sm:text-sm font-medium acc-soft-40 acc-hover-60 border acc-border rounded-xl acc-on-accent transition-colors">
                                     Play now
                                 </button>
                             </div>

@@ -72,7 +72,7 @@ export default function TagEditor({ track, onClose, onSaved }: Props) {
         </div>
         {error && <div className="mt-2 text-xs text-red-400">{error}</div>}
         <button onClick={save} disabled={saving}
-          className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm acc-soft-40 acc-hover-60 border acc-border rounded-xl text-white transition-colors disabled:opacity-40">
+          className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm acc-soft-40 acc-hover-60 border acc-border rounded-xl acc-on-accent transition-colors disabled:opacity-40">
           <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save tags'}
         </button>
       </div>

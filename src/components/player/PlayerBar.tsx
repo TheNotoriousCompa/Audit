@@ -197,7 +197,7 @@ export default function PlayerBar({ queue, queueIndex, onAdvance, onAudioReady, 
             <SkipBack className="w-5 h-5" />
           </button>
           <button onClick={toggle} title={playing ? 'Pause' : 'Play'}
-            className="p-2 rounded-full acc-soft-40 acc-hover-60 border acc-border text-white transition-colors" disabled={!current}>
+            className="p-2 rounded-full acc-soft-40 acc-hover-60 border acc-border acc-on-accent transition-colors" disabled={!current}>
             {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
           </button>
           <button onClick={() => { const n = pickNext(1); if (n >= 0) onAdvance(n); }} title="Next"

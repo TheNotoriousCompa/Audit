@@ -110,11 +110,18 @@ body {
    player/library greens go through these utilities (Spotify rule:
    one functional accent only). */
 :root {
-  --audit-accent: #50C878;
+  --audit-accent: #ffffff;
+  --audit-accent-contrast: #0b0b0d;
 }
 
 .acc-text {
   color: var(--audit-accent);
+}
+
+/* Text/icon placed on the accent color itself. Keeps contrast when the accent
+   is light (white default) without hardcoding white text. */
+.acc-on-accent {
+  color: var(--audit-accent-contrast, #ffffff);
 }
 
 .acc-text-dim {

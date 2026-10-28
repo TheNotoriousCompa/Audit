@@ -47,7 +47,7 @@ export default function NowPlaying({
             <SkipBack className="w-3.5 h-3.5" />
           </button>
           <button onClick={onToggle} title={playing ? 'Pause' : 'Play'} disabled={!track}
-            className="p-1.5 rounded-full acc-soft-40 acc-hover-60 border acc-border text-white transition-colors disabled:opacity-30">
+            className="p-1.5 rounded-full acc-soft-40 acc-hover-60 border acc-border acc-on-accent transition-colors disabled:opacity-30">
             {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
           </button>
           <button onClick={onNext} title="Next" disabled={!track}

@@ -69,7 +69,7 @@ export default function MiniView() {
         WebkitAppRegion: 'drag',
         backgroundColor: 'rgba(14, 14, 17, 0.94)',
         boxShadow: '0 12px 32px rgba(0, 0, 0, 0.55)',
-        '--audit-accent': state?.accent || '#50C878',
+        '--audit-accent': state?.accent || '#ffffff',
       } as React.CSSProperties}
     >
       {/* Artwork + title + window actions */}

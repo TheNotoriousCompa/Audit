@@ -419,7 +419,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
         {nav.map(({ id, label, Icon }) => (
           <button key={id}
             onClick={() => setView(id)}
-            className={`relative z-10 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 py-1 rounded-lg text-[10px] sm:text-[11px] font-medium transition-colors ${view === id ? 'acc-text' : 'text-gray-400 acc-hover-text'}`}>
+            className={`relative z-10 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 py-1 rounded-lg text-[10px] sm:text-[11px] font-medium transition-colors ${view === id ? 'acc-on-accent' : 'text-gray-400 acc-hover-text'}`}>
             <Icon className="w-3.5 h-3.5" />
             {label}
           </button>
@@ -434,7 +434,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
           <span className="flex-1">{notice}</span>
           {queue.length > 0 && queueIndex < 0 && (
             <button onClick={() => { setQueueIndex(0); setNotice(null); }}
-              className="px-2 py-0.5 rounded-lg acc-soft-40 acc-hover-60 text-white transition-colors">
+              className="px-2 py-0.5 rounded-lg acc-soft-40 acc-hover-60 acc-on-accent transition-colors">
               Play
             </button>
           )}

@@ -15,7 +15,7 @@ interface PersonalizeProps {
 type ColorKey = 'lineColor' | 'backgroundColor';
 
 const ROWS: { key: ColorKey; label: string; hint: string; fallback: string }[] = [
-  { key: 'lineColor', label: 'Accent', hint: 'Wave, buttons, highlights', fallback: '#50C878' },
+  { key: 'lineColor', label: 'Accent', hint: 'Wave, buttons, highlights', fallback: '#ffffff' },
   { key: 'backgroundColor', label: 'Background', hint: 'Behind the waves', fallback: '#000000' },
 ];
 
