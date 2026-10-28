@@ -37,7 +37,6 @@ function shuffled<T>(arr: T[]): T[] {
 
 function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }: Props) {
   const [view, setView] = useState<View>('player');
-  const [slideDir, setSlideDir] = useState<1 | -1>(1);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [roots, setRoots] = useState<string[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -417,12 +416,9 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
             width: 'calc(20% - 0.3rem)',
           }}
         />
-        {nav.map(({ id, label, Icon }, idx) => (
+        {nav.map(({ id, label, Icon }) => (
           <button key={id}
-            onClick={() => {
-              setSlideDir(idx >= navIndex ? 1 : -1);
-              setView(id);
-            }}
+            onClick={() => setView(id)}
             className={`relative z-10 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 py-1 rounded-lg text-[10px] sm:text-[11px] font-medium transition-colors ${view === id ? 'acc-text' : 'text-gray-400 acc-hover-text'}`}>
             <Icon className="w-3.5 h-3.5" />
             {label}
@@ -449,11 +445,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
         </div>
       )}
 
-      <div
-        key={view}
-        className="view-in"
-        style={{ '--view-x': `${slideDir * 26}px` } as React.CSSProperties}
-      >
+      <div key={view} className="view-in">
       {view === 'player' && (
         <>
           <NowPlaying

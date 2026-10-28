@@ -88,11 +88,11 @@ body {
   accent-color: var(--audit-accent, #1ed760);
 }
 
-/* Player view entry: slide from the side of the target nav item. */
+/* Player view entry: vertical fade (top to bottom), like the main-menu popovers. */
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translate3d(var(--view-x, 0px), -10px, 0) scale(0.98);
+    transform: translate3d(0, -10px, 0) scale(0.98);
   }
   to {
     opacity: 1;

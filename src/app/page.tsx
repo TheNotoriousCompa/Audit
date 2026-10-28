@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Footer from '@/components/sections/Footer';
 import Background from "@/components/background";
 import DownloadProgressComponent from "@/components/DownloadProgress";
-import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Palette, ArrowDownToLine, ListMusic, PictureInPicture2 } from "lucide-react";
+import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Settings, Palette, ArrowDownToLine, ListMusic, PictureInPicture2 } from "lucide-react";
 import Personalize from '@/components/sections/Personalize';
 import DownloadButton from '@/components/DownloadButton';
 import StatusMessage from '@/components/StatusMessage';
@@ -58,6 +58,7 @@ export default function Home() {
     const timeout = 300;
     const [showPersonalize, setShowPersonalize] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
+    const [showDownloads, setShowDownloads] = useState(false);
 
     // Server and client must render the same first paint: reading
     // localStorage in a useState initializer caused a hydration mismatch
@@ -564,6 +565,7 @@ export default function Home() {
                         onClick={() => {
                             setShowPersonalize(!showPersonalize);
                             if (showInfo) setShowInfo(false);
+                            if (showDownloads) setShowDownloads(false);
                         }}
                         className={`p-1.5 rounded-lg transition-colors acc-hover-text ${showPersonalize ? 'bg-white/10 acc-text' : 'hover:bg-white/5'}`}
                         title="Personalize"
@@ -574,11 +576,23 @@ export default function Home() {
                         onClick={() => {
                             setShowInfo(true);
                             if (showPersonalize) setShowPersonalize(false);
+                            if (showDownloads) setShowDownloads(false);
                         }}
                         className={`p-1.5 rounded-lg transition-colors acc-hover-text ${showInfo ? 'bg-white/10 acc-text' : 'hover:bg-white/5'}`}
                         title="Info"
                     >
                         <InfoIcon className="w-5 h-5 text-gray-300 acc-hover-text transition-colors" />
+                    </button>
+                    <button
+                        onClick={() => {
+                            setShowDownloads(!showDownloads);
+                            if (showPersonalize) setShowPersonalize(false);
+                            if (showInfo) setShowInfo(false);
+                        }}
+                        className={`p-1.5 rounded-lg transition-colors acc-hover-text ${showDownloads ? 'bg-white/10 acc-text' : 'hover:bg-white/5'}`}
+                        title="Download options"
+                    >
+                        <Settings className="w-5 h-5 text-gray-300 acc-hover-text transition-colors" />
                     </button>
                     <button
                         onClick={() => window.electronAPI?.toggleMini?.()}
@@ -616,7 +630,7 @@ export default function Home() {
             </div>
 
             {/* Global title-bar popovers: style + info live here, not inside tabs */}
-            {(showPersonalize || showInfo) && (
+            {(showPersonalize || showInfo || showDownloads) && (
                 <div
                     className="absolute top-14 left-2 z-50 w-[320px] max-w-[calc(100vw-1rem)] max-h-[calc(100vh-5rem)] overflow-y-auto rounded-2xl glass-popover p-3 flex flex-col gap-3"
                     style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -638,6 +652,68 @@ export default function Home() {
                             show
                             onClose={() => setShowInfo(false)}
                         />
+                    )}
+                    {showDownloads && (
+                        <div className="w-full">
+                            <div className="flex items-center justify-between px-1 pb-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="w-1.5 h-1.5 rounded-full acc-bg shrink-0" />
+                                    <h2 className="text-sm font-semibold text-white">Download</h2>
+                                </div>
+                                <button
+                                    onClick={() => setShowDownloads(false)}
+                                    aria-label="Close"
+                                    className="p-1 -mr-1 rounded-lg text-gray-400 acc-hover-text transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            <div className="rounded-xl border border-white/5 divide-y divide-white/5">
+                                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                                    <span className="text-[11px] text-gray-400">Format</span>
+                                    <div className="flex gap-1">
+                                        {(['mp3', 'mp4'] as const).map((f) => (
+                                            <button key={f}
+                                                onClick={() => {
+                                                    setFormat(f);
+                                                    setQuality(f === 'mp4' ? '1080p' : '320');
+                                                    setFps(null);
+                                                }}
+                                                className={`px-2.5 py-1 rounded-lg text-[10px] uppercase tracking-wider border transition-colors ${format === f ? 'acc-soft-20 acc-text acc-border' : 'border-transparent text-gray-400 hover:bg-white/5'}`}>
+                                                {f}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                                    <span className="text-[11px] text-gray-400">{format === 'mp4' ? 'Resolution' : 'Bitrate'}</span>
+                                    <div className="flex gap-1 flex-wrap justify-end">
+                                        {(format === 'mp4' ? ['1080p', '720p', '480p', '360p'] : ['320', '256', '192', '128']).map((q) => (
+                                            <button key={q} onClick={() => setQuality(q)}
+                                                className={`px-2 py-1 rounded-lg text-[10px] tabular-nums border transition-colors ${quality === q ? 'acc-soft-20 acc-text acc-border' : 'border-transparent text-gray-400 hover:bg-white/5'}`}>
+                                                {format === 'mp4' ? q : `${q}k`}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {format === 'mp4' && (
+                                    <div className="flex items-center justify-between gap-3 px-3 py-2">
+                                        <span className="text-[11px] text-gray-400">Framerate</span>
+                                        <div className="flex gap-1">
+                                            {[{ v: null as number | null, l: 'Auto' }, { v: 30, l: '30' }, { v: 60, l: '60' }].map(({ v, l }) => (
+                                                <button key={l} onClick={() => setFps(v)}
+                                                    className={`px-2 py-1 rounded-lg text-[10px] border transition-colors ${fps === v ? 'acc-soft-20 acc-text acc-border' : 'border-transparent text-gray-400 hover:bg-white/5'}`}>
+                                                    {l}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     )}
                 </div>
             )}
@@ -676,52 +752,6 @@ export default function Home() {
                         {/* Both sections stay mounted (hidden toggle): download input survives tab
                             switches, and the player keeps publishing state to the mini player. */}
                         <div ref={downloadRef} className={tab === 'download' ? 'flex flex-col gap-5' : 'hidden'}>
-                        {/* Download options: two settings, always visible, Info/Colors styling */}
-                        <div className="rounded-xl border border-white/5 divide-y divide-white/5">
-                            <div className="flex items-center justify-between gap-3 px-3 py-2">
-                                <span className="text-[11px] text-gray-400">Format</span>
-                                <div className="flex gap-1">
-                                    {(['mp3', 'mp4'] as const).map((f) => (
-                                        <button key={f}
-                                            onClick={() => {
-                                                setFormat(f);
-                                                setQuality(f === 'mp4' ? '1080p' : '320');
-                                                setFps(null);
-                                            }}
-                                            className={`px-2.5 py-1 rounded-lg text-[10px] uppercase tracking-wider border transition-colors ${format === f ? 'acc-soft-20 acc-text acc-border' : 'border-transparent text-gray-400 hover:bg-white/5'}`}>
-                                            {f}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-between gap-3 px-3 py-2">
-                                <span className="text-[11px] text-gray-400">{format === 'mp4' ? 'Resolution' : 'Bitrate'}</span>
-                                <div className="flex gap-1 flex-wrap justify-end">
-                                    {(format === 'mp4' ? ['1080p', '720p', '480p', '360p'] : ['320', '256', '192', '128']).map((q) => (
-                                        <button key={q} onClick={() => setQuality(q)}
-                                            className={`px-2 py-1 rounded-lg text-[10px] tabular-nums border transition-colors ${quality === q ? 'acc-soft-20 acc-text acc-border' : 'border-transparent text-gray-400 hover:bg-white/5'}`}>
-                                            {format === 'mp4' ? q : `${q}k`}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {format === 'mp4' && (
-                                <div className="flex items-center justify-between gap-3 px-3 py-2">
-                                    <span className="text-[11px] text-gray-400">Framerate</span>
-                                    <div className="flex gap-1">
-                                        {[{ v: null as number | null, l: 'Auto' }, { v: 30, l: '30' }, { v: 60, l: '60' }].map(({ v, l }) => (
-                                            <button key={l} onClick={() => setFps(v)}
-                                                className={`px-2 py-1 rounded-lg text-[10px] border transition-colors ${fps === v ? 'acc-soft-20 acc-text acc-border' : 'border-transparent text-gray-400 hover:bg-white/5'}`}>
-                                                {l}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
                         <div className="flex gap-2 w-full">
                             <div className="flex-1">
                                 <input
