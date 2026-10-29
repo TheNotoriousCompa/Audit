@@ -1,9 +1,10 @@
-import { ipcMain, dialog, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
+import { ipcMain, dialog, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { getMainWindow } from './window';
 import { runDownload, stopDownload } from './python-bridge';
 import { scanLibrary, getTrackArt, writeTrackTags, loadLibraryCache, saveLibraryCache } from './library';
 import { queryTracks, libraryStats, recordDownload } from './db';
 import { approveRoot, isApprovedFile } from './approved-paths';
+import { getFfmpegStatus } from './ffmpeg-status';
 import { assertTrustedSender, isTrustedSender } from './trust';
 import type { DownloadOptions, DownloadResult, LibraryQuery } from '../types/electron';
 
@@ -33,6 +34,21 @@ export function registerIPCHandlers(): void {
     } catch (error) {
       console.error('Error in dialog:openFolder:', error);
       return null;
+    }
+  });
+
+  ipcMain.handle('system:ffmpegStatus', async (event, force?: boolean) => {
+    guard(event);
+    return getFfmpegStatus(Boolean(force));
+  });
+
+  ipcMain.handle('system:ffmpegHelp', async (event) => {
+    guard(event);
+    try {
+      await shell.openExternal('https://ffmpeg.org/download.html');
+      return true;
+    } catch {
+      return false;
     }
   });
 

@@ -3,14 +3,14 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Footer from '@/components/sections/Footer';
 import Background from "@/components/background";
 import DownloadProgressComponent from "@/components/DownloadProgress";
-import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Settings, Palette, ArrowDownToLine, ListMusic, PictureInPicture2 } from "lucide-react";
+import { FolderOpen, FileSpreadsheet, FileText, Minus, Square, X, Info as InfoIcon, Settings, Palette, ArrowDownToLine, ListMusic, PictureInPicture2, AlertTriangle, RefreshCw, ExternalLink } from "lucide-react";
 import Personalize from '@/components/sections/Personalize';
 import DownloadButton from '@/components/DownloadButton';
 import StatusMessage from '@/components/StatusMessage';
 import PlayerSection from '@/components/player/PlayerSection';
 import MiniView from '@/components/player/MiniView';
 import Info from '@/components/sections/Info';
-import type { DownloadProgress, DownloadResult, DownloadStatus } from '@/types/electron';
+import type { DownloadProgress, DownloadResult, DownloadStatus, FfmpegStatus } from '@/types/electron';
 
 const defaultProgress = (overrides?: Partial<DownloadProgress>): DownloadProgress => ({
     percentage: 0,
@@ -112,6 +112,26 @@ export default function Home() {
     }, [colors]);
 
     const [progress, setProgress] = useState<DownloadProgress>(defaultProgress());
+    const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
+    const [ffmpegChecking, setFfmpegChecking] = useState(false);
+
+    const checkFfmpeg = useCallback(async (force = false) => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        if (!api?.ffmpegStatus) return;
+        setFfmpegChecking(true);
+        try {
+            const status = await api.ffmpegStatus(force);
+            setFfmpeg(status);
+        } catch (err) {
+            console.error('FFmpeg status check failed:', err);
+        } finally {
+            setFfmpegChecking(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void checkFfmpeg(false);
+    }, [checkFfmpeg]);
 
     const [processPlaylist, setProcessPlaylist] = useState(false);
     const [isPlaylist, setIsPlaylist] = useState(false);
@@ -534,8 +554,10 @@ export default function Home() {
                     setHarvest({ since: downloadStartedAt, autoplay: false });
                     setProgress(prev => ({ ...prev, status: 'finished', percentage: 100 }));
                 } else {
-                    setError(result.error || 'Failed to download');
-                    setProgress(prev => ({ ...prev, status: 'error', message: result.error || 'Failed to download' }));
+                    const failure = result.error || result.message || 'Failed to download';
+                    setError(failure);
+                    setProgress(prev => ({ ...prev, status: 'error', message: failure }));
+                    void checkFfmpeg(true);
                 }
             } else {
                 setError('Electron API not available');
@@ -761,6 +783,32 @@ export default function Home() {
                             </span>
                         </button>
                     </div>
+                    {ffmpeg && !ffmpeg.found && (
+                        <div
+                            className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 shrink-0"
+                            title={ffmpeg.error}
+                        >
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+                            <span className="flex-1 min-w-[180px]">
+                                FFmpeg was not found. Downloads that need conversion will fail.
+                            </span>
+                            <button
+                                onClick={() => void checkFfmpeg(true)}
+                                disabled={ffmpegChecking}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg border border-amber-400/30 hover:bg-amber-400/10 disabled:opacity-50 transition-colors"
+                            >
+                                <RefreshCw className={`w-3 h-3 ${ffmpegChecking ? 'animate-spin' : ''}`} />
+                                {ffmpegChecking ? 'Checking' : 'Recheck'}
+                            </button>
+                            <button
+                                onClick={() => void window.electronAPI?.openFfmpegHelp?.()}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg border border-amber-400/30 hover:bg-amber-400/10 transition-colors"
+                            >
+                                <ExternalLink className="w-3 h-3" />
+                                How to fix
+                            </button>
+                        </div>
+                    )}
                     <div className="space-y-5 w-full flex-1 min-h-0 overflow-y-auto pr-1">
                         {/* Both sections stay mounted (hidden toggle): download input survives tab
                             switches, and the player keeps publishing state to the mini player. */}

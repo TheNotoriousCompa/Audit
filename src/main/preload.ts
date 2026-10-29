@@ -33,6 +33,12 @@ const electronAPI: ElectronAPI = {
       throw error;
     });
   },
+  ffmpegStatus: (force = false) => {
+    return ipcRenderer.invoke('system:ffmpegStatus', force);
+  },
+  openFfmpegHelp: (): Promise<boolean> => {
+    return ipcRenderer.invoke('system:ffmpegHelp');
+  },
   onDownloadProgress: (callback: (event: IpcRendererEvent, progress: Partial<DownloadProgress> & Record<string, unknown>) => void): void => {
     ipcRenderer.on('download-progress', callback);
   },

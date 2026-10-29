@@ -97,3 +97,13 @@ Fuori dalle fasi 0-3, da affrontare nella fase 4:
 - `Recently downloaded` ora usa `downloadedOnly`: la vista mostra solo le tracce con `downloaded_at`, non l'intera libreria ordinata per mtime. Verificato: 1 traccia su 1406.
 - Il menu dei tre puntini di `TrackRow` e' renderizzato in un portal su `document.body`, con posizione fissa e `z-index: 1000`. Non viene piu' tagliato dai contenitori `overflow` della libreria; se la riga e' in basso, il menu si apre verso l'alto. Verificato con menu dentro il viewport e `elementFromPoint` sopra il menu.
 - Il sort scelto in `All Songs` non viene piu' sovrascritto aprendo `Recently downloaded`.
+
+## 9. FFmpeg preflight e messaggi
+
+- Nuovo `ffmpeg-status.ts`: risoluzione in ordine `AUDIT_FFMPEG_PATH`, bundle, PATH, percorsi comuni Windows; nessuna scansione profonda di `C:\`.
+- Il binario viene validato con `ffmpeg -version` e timeout di 3 secondi; il risultato include path e versione.
+- IPC `system:ffmpegStatus` e `system:ffmpegHelp`; il renderer mostra un banner ambra solo quando FFmpeg manca.
+- `Recheck` invalida la cache e ricontrolla senza riavviare; `How to fix` apre la pagina ufficiale.
+- Il messaggio completo del fallimento viene propagato da `result.message` quando `result.error` è vuoto.
+- `check_ffmpeg` Python usa lo stesso ordine e non esegue piu' `where /R C:\`.
+- Test manuale Windows per amici: `docs/FFMPEG_TEST_CHECKLIST.md`.

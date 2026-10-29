@@ -143,6 +143,13 @@ export interface TrackArt {
   error: string;
 }
 
+export interface FfmpegStatus {
+  found: boolean;
+  path: string;
+  version: string;
+  error: string;
+}
+
 export interface WriteTagFields {
   title: string;
   artist: string;
@@ -186,6 +193,8 @@ export interface ElectronAPI {
   removeProgressListener: (callback: ProgressCallback) => void;
   selectFolder: () => Promise<string | null>;
   stopDownload: () => void;
+  ffmpegStatus: (force?: boolean) => Promise<FfmpegStatus>;
+  openFfmpegHelp: () => Promise<boolean>;
 
   // Local library (player)
   scanLibrary: (dir: string) => Promise<LibraryScanResult>;
