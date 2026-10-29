@@ -54,7 +54,7 @@ const Info: React.FC<InfoProps> = ({ show, onClose }) => {
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-1.5 h-1.5 rounded-full acc-bg shrink-0" />
               <h2 className="text-sm font-semibold text-white">Info</h2>
-              <span className="text-[11px] text-gray-500 truncate">Audit v1.4.0</span>
+              <span className="text-[11px] text-gray-500 truncate">Audit v1.4.1</span>
             </div>
             <button
               onClick={onClose}
