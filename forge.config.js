@@ -118,7 +118,9 @@ const config = {
       "./ffmpeg",
     ],
   },
-  rebuildConfig: {},
+  // better-sqlite3 is rebuilt for Electron by postinstall. Forge's bundled
+  // rebuild step fails on VS2022-only runners, so reuse the installed binary.
+  rebuildConfig: { onlyModules: [] },
   makers: [
     {
       name: '@electron-forge/maker-zip',
