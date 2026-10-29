@@ -379,6 +379,11 @@ export function queryTracks(options: LibraryQuery = {}): LibraryQueryResult {
   if (options.downloadedOnly) {
     base.push('t.downloaded_at IS NOT NULL');
   }
+  if (options.mediaType === 'music') {
+    base.push("t.ext <> 'mp4'");
+  } else if (options.mediaType === 'videos') {
+    base.push("t.ext = 'mp4'");
+  }
   if (options.genre) {
     base.push('(t.genre_guess = @genre OR t.genre = @genre)');
     baseParams.genre = options.genre;

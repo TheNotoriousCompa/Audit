@@ -21,6 +21,7 @@ export interface TransportControls {
   toggle: () => void;
   prev: () => void;
   next: () => void;
+  stop: () => void;
   seek: (pos: number) => void;
   setVolume: (vol: number) => void;
 }
@@ -147,6 +148,15 @@ export default function PlayerBar({ queue, queueIndex, onAdvance, onAudioReady, 
       next: () => {
         const n = pickNext(1);
         if (n >= 0) onAdvance(n);
+      },
+      stop: () => {
+        const el = audioRef.current;
+        if (el) {
+          el.pause();
+          el.currentTime = 0;
+        }
+        setPlaying(false);
+        setPos(0);
       },
       seek: (seekPos: number) => {
         const el = audioRef.current;

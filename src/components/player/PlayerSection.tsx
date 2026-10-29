@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Disc3, Library, FolderOpen, ListMusic, SlidersHorizontal } from 'lucide-react';
 import type { Track } from '@/types/electron';
 import LibraryHome from './LibraryHome';
@@ -10,6 +10,8 @@ import NowPlaying from './NowPlaying';
 import QueueView from './QueueView';
 import PlaylistsPanel from './PlaylistsPanel';
 import TagEditor from './TagEditor';
+import VideoPlayer from './VideoPlayer';
+import { isVideoTrack } from './media';
 import { invalidateArt } from './useArt';
 import {
   Playlist, loadPlaylists, savePlaylists, createPlaylist, resolvePlaylist,
@@ -45,6 +47,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
   const [scanError, setScanError] = useState<string | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [queueIndex, setQueueIndex] = useState(-1);
+  const [videoTrack, setVideoTrack] = useState<Track | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.9);
@@ -56,6 +59,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
   const lastScanAt = React.useRef(0);
   const lastSentArt = React.useRef<string | null>(null);
   const lastSentArtPath = React.useRef<string | null>(null);
+  const musicTracks = useMemo(() => tracks.filter((track) => !isVideoTrack(track)), [tracks]);
 
   useEffect(() => {
     let live = true;
@@ -259,7 +263,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
             for (const p of saved.paths) {
               if (typeof p === 'string') {
                 const t = byPath.get(p);
-                if (t) restored.push(t);
+                if (t && !isVideoTrack(t)) restored.push(t);
               }
             }
             if (restored.length > 0) {
@@ -274,9 +278,9 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
         // fall through to default fill
       }
     }
-    setQueue(tracks);
+    setQueue(musicTracks);
     setQueueIndex(-1);
-  }, [tracks, queue.length]);
+  }, [tracks, queue.length, musicTracks]);
 
   const handleAddRoot = useCallback(async () => {
     try {
@@ -296,11 +300,20 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
     setView('player');
   }, []);
 
+  const handlePlayVideo = useCallback((track: Track) => {
+    transportRef.current?.stop();
+    setVideoTrack(track);
+  }, []);
+
   const playTrack = useCallback((track: Track, context: Track[]) => {
+    if (isVideoTrack(track)) {
+      handlePlayVideo(track);
+      return;
+    }
     const ctx = context.length > 0 ? context : [track];
     const idx = Math.max(0, ctx.findIndex((t) => t.path === track.path));
     playList(ctx, idx);
-  }, [playList]);
+  }, [handlePlayVideo, playList]);
 
   const playNext = useCallback((track: Track) => {
     setQueue((q) => {
@@ -509,6 +522,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
           tracks={tracks}
           playlists={playlists}
           onPlay={playTrack}
+          onPlayVideo={handlePlayVideo}
           onPlayNext={playNext}
           onAddToQueue={(t) => appendToQueue(t)}
           onAddToPlaylist={handleAddToPlaylist}
@@ -519,7 +533,7 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
       {view === 'folders' && (
         <FoldersView
           roots={roots}
-          tracks={tracks}
+          tracks={musicTracks}
           scanning={scanning}
           playlists={playlists}
           onAddRoot={handleAddRoot}
@@ -564,6 +578,9 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
         volume={volume} onVolumeChange={setVolume} />
       {editingTrack && (
         <TagEditor track={editingTrack} onClose={() => setEditingTrack(null)} onSaved={handleTagSaved} />
+      )}
+      {videoTrack && (
+        <VideoPlayer track={videoTrack} onClose={() => setVideoTrack(null)} />
       )}
     </div>
   );

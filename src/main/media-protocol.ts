@@ -6,7 +6,7 @@ import { isApprovedFile } from './approved-paths';
 const MIME_BY_EXT: Record<string, string> = {
   '.mp3': 'audio/mpeg',
   '.m4a': 'audio/mp4',
-  '.mp4': 'audio/mp4',
+  '.mp4': 'video/mp4',
   '.flac': 'audio/flac',
   '.wav': 'audio/wav',
   '.opus': 'audio/opus',

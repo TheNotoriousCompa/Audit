@@ -33,12 +33,20 @@ function track(file, title) {
 try {
   const a = path.join(root, 'a.mp3');
   const b = path.join(root, 'b.mp3');
+  const v = path.join(root, 'v.mp4');
   fs.writeFileSync(a, 'a');
   fs.writeFileSync(b, 'b');
+  fs.writeFileSync(v, 'v');
 
   db.initDb(path.join(root, 'fresh.db'));
-  db.upsertTracks([track(a, 'A'), track(b, 'B')]);
-  assert.equal(db.queryTracks({}).total, 2);
+  db.upsertTracks([
+    track(a, 'A'),
+    track(b, 'B'),
+    { ...track(v, 'V'), filename: 'v.mp4', ext: 'mp4' },
+  ]);
+  assert.equal(db.queryTracks({}).total, 3);
+  assert.equal(db.queryTracks({ mediaType: 'music' }).total, 2);
+  assert.equal(db.queryTracks({ mediaType: 'videos' }).total, 1);
   db.recordDownload(a, 'https://youtu.be/x');
   assert.ok(db.getDownloadedAt(a));
   assert.equal(db.queryTracks({ sort: 'downloaded' }).items[0].path, a);

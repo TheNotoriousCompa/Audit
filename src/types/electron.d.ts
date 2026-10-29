@@ -117,6 +117,8 @@ export interface LibraryQuery {
   genre?: string;
   /** Only tracks downloaded by Audit (downloaded_at is present). */
   downloadedOnly?: boolean;
+  /** Separate music files from .mp4 videos. */
+  mediaType?: 'music' | 'videos';
   limit?: number;
   offset?: number;
 }

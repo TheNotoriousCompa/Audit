@@ -107,3 +107,12 @@ Fuori dalle fasi 0-3, da affrontare nella fase 4:
 - Il messaggio completo del fallimento viene propagato da `result.message` quando `result.error` è vuoto.
 - `check_ffmpeg` Python usa lo stesso ordine e non esegue piu' `where /R C:\`.
 - Test manuale Windows per amici: `docs/FFMPEG_TEST_CHECKLIST.md`.
+
+## 10. Videos
+
+- I file `.mp4` sono esclusi da All Songs, Artists, Albums, Genres, Recently downloaded e Folders.
+- Nuova categoria `Videos` nella Library, con conteggio separato e ricerca dedicata.
+- `library:query` supporta `mediaType: 'music' | 'videos'`; il DB filtra `ext`.
+- Il click su un video apre un player overlay con `<video controls autoPlay>` e `media://`; l'audio del player musicale viene messo in pausa.
+- Il protocollo serve `.mp4` come `video/mp4`.
+- La coda musicale non include i video.

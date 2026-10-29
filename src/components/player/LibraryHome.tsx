@@ -1,15 +1,17 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, ChevronLeft, Music2, Users, Disc3, Tags, Clock } from 'lucide-react';
+import { Search, ChevronLeft, Music2, Users, Disc3, Tags, Clock, Film, Play } from 'lucide-react';
 import type { LibrarySort, Track } from '@/types/electron';
 import TrackRow, { PlaylistRef } from './TrackRow';
+import { isVideoTrack } from './media';
 
-export type CategoryKind = 'all' | 'artists' | 'albums' | 'genres' | 'recent';
+export type CategoryKind = 'all' | 'artists' | 'albums' | 'genres' | 'recent' | 'videos';
 
 interface Props {
   tracks: Track[];
   playlists: PlaylistRef[];
   onPlay: (track: Track, context: Track[]) => void;
+  onPlayVideo: (track: Track) => void;
   onPlayNext: (track: Track) => void;
   onAddToQueue: (track: Track) => void;
   onAddToPlaylist: (playlistId: string, track: Track) => void;
@@ -63,7 +65,7 @@ function groupBy(tracks: Track[], key: (t: Track) => string): { name: string; it
 }
 
 export default function LibraryHome({
-  tracks, playlists, onPlay, onPlayNext, onAddToQueue, onAddToPlaylist, onEditTags,
+  tracks, playlists, onPlay, onPlayVideo, onPlayNext, onAddToQueue, onAddToPlaylist, onEditTags,
 }: Props) {
   const [cat, setCat] = useState<CategoryKind | null>(null);
   const [group, setGroup] = useState<string | null>(null);
@@ -87,32 +89,36 @@ export default function LibraryHome({
 
   // Views backed by SQLite (sort + pagination). Groups stay in-memory for now.
   const dbView = cat === 'all' || cat === 'recent';
+  const videoView = cat === 'videos';
   const effectiveSort: LibrarySort = cat === 'recent' ? 'downloaded' : sort;
   const downloadedOnly = cat === 'recent';
+  const musicTracks = useMemo(() => tracks.filter((track) => !isVideoTrack(track)), [tracks]);
+  const videoTracks = useMemo(() => tracks.filter((track) => isVideoTrack(track)), [tracks]);
 
   const tiles = useMemo(() => {
-    const artists = new Set(tracks.map((t) => normKey(t.artist || 'Unknown'))).size;
-    const albums = new Set(tracks.map((t) => normKey(t.album || 'Unknown'))).size;
+    const artists = new Set(musicTracks.map((t) => normKey(t.artist || 'Unknown'))).size;
+    const albums = new Set(musicTracks.map((t) => normKey(t.album || 'Unknown'))).size;
     const genres = new Set(
-      tracks.map((t) => (t.genre_guess || '').trim()).filter((g) => g.length > 0)
+      musicTracks.map((t) => (t.genre_guess || '').trim()).filter((g) => g.length > 0)
     ).size;
-    const downloaded = tracks.filter((t) => typeof t.downloaded_at === 'number').length;
+    const downloaded = musicTracks.filter((t) => typeof t.downloaded_at === 'number').length;
     return [
-      { kind: 'all' as CategoryKind, label: 'All Songs', count: tracks.length, Icon: Music2 },
+      { kind: 'all' as CategoryKind, label: 'All Songs', count: musicTracks.length, Icon: Music2 },
       { kind: 'artists' as CategoryKind, label: 'Artists', count: artists, Icon: Users },
       { kind: 'albums' as CategoryKind, label: 'Albums', count: albums, Icon: Disc3 },
       { kind: 'genres' as CategoryKind, label: 'Genres', count: genres, Icon: Tags },
       { kind: 'recent' as CategoryKind, label: 'Recently downloaded', count: downloaded, Icon: Clock },
+      { kind: 'videos' as CategoryKind, label: 'Videos', count: videoTracks.length, Icon: Film },
     ];
-  }, [tracks]);
+  }, [musicTracks, videoTracks]);
 
   const groups = useMemo(() => {
     if (!cat) return null;
-    if (cat === 'artists') return groupBy(tracks, (t) => t.artist);
-    if (cat === 'albums') return groupBy(tracks, (t) => t.album);
-    if (cat === 'genres') return groupBy(tracks, (t) => t.genre_guess || t.genre);
+    if (cat === 'artists') return groupBy(musicTracks, (t) => t.artist);
+    if (cat === 'albums') return groupBy(musicTracks, (t) => t.album);
+    if (cat === 'genres') return groupBy(musicTracks, (t) => t.genre_guess || t.genre);
     return null;
-  }, [cat, tracks]);
+  }, [cat, musicTracks]);
 
   const groupedList: Track[] = useMemo(() => {
     if (!cat) return [];
@@ -130,7 +136,7 @@ export default function LibraryHome({
       const q = filter.trim().toLowerCase();
       const match = (t: Track) =>
         !q || `${t.title} ${t.artist} ${t.album} ${t.genre} ${t.genre_guess} ${t.filename}`.toLowerCase().includes(q);
-      const sorted = [...tracks]
+      const sorted = [...musicTracks]
         .filter((t) => !downloadedOnly || typeof t.downloaded_at === 'number')
         .filter(match)
         .sort((a, b) => {
@@ -152,6 +158,7 @@ export default function LibraryHome({
         sort: effectiveSort,
         filter: filter.trim() || undefined,
         downloadedOnly,
+        mediaType: 'music',
         limit: PAGE_SIZE,
         offset,
       });
@@ -166,7 +173,7 @@ export default function LibraryHome({
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [effectiveSort, filter, tracks, downloadedOnly]);
+  }, [effectiveSort, filter, musicTracks, downloadedOnly]);
 
   useEffect(() => {
     if (!dbView) {
@@ -187,8 +194,15 @@ export default function LibraryHome({
     try { window.localStorage.setItem(SORT_KEY, sort); } catch { /* session-only */ }
   }, [sort]);
 
+  const videoList = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return videoTracks
+      .filter((t) => !q || `${t.title} ${t.filename}`.toLowerCase().includes(q))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }, [videoTracks, filter]);
+
   const list = dbView ? items : groupedList;
-  const headerCount = dbView ? total : cat && group ? groupedList.length : tracks.length;
+  const headerCount = videoView ? videoList.length : dbView ? total : cat && group ? groupedList.length : musicTracks.length;
 
   const playFromRow = useCallback(async (track: Track, fallback: Track[]) => {
     if (!dbView) {
@@ -201,6 +215,7 @@ export default function LibraryHome({
         sort: effectiveSort,
         filter: filter.trim() || undefined,
         downloadedOnly,
+        mediaType: 'music',
         limit: 5000,
         offset: 0,
       });
@@ -234,7 +249,7 @@ export default function LibraryHome({
         )}
         <div className="text-sm text-gray-200 font-medium">
           {!cat ? 'Library' : group || tiles.find((t) => t.kind === cat)?.label}
-          <span className="text-gray-500 font-normal"> · {headerCount} songs</span>
+          <span className="text-gray-500 font-normal"> · {headerCount} {videoView ? 'videos' : 'songs'}</span>
         </div>
       </div>
 
@@ -266,7 +281,7 @@ export default function LibraryHome({
         </div>
       )}
 
-      {cat && (group || dbView) && (
+      {cat && (group || dbView || videoView) && (
         <>
           <div className="relative my-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -293,17 +308,26 @@ export default function LibraryHome({
             </div>
           )}
 
-          <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-800/40 divide-y divide-gray-800/40">
-            {list.length === 0 && !loading && <div className="p-4 text-center text-xs text-gray-500">No matches.</div>}
-            {list.map((t) => (
-              <TrackRow key={t.path} track={t} playlists={playlists}
-                onPlay={() => { void playFromRow(t, list); }}
-                onPlayNext={() => onPlayNext(t)}
-                onAddToQueue={() => onAddToQueue(t)}
-                onAddToPlaylist={(id) => onAddToPlaylist(id, t)}
-                onEditTags={() => onEditTags(t)} />
-            ))}
-          </div>
+          {videoView ? (
+            <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-800/40 divide-y divide-gray-800/40">
+              {videoList.length === 0 && <div className="p-4 text-center text-xs text-gray-500">No videos.</div>}
+              {videoList.map((t) => (
+                <VideoRow key={t.path} track={t} onOpen={() => onPlayVideo(t)} />
+              ))}
+            </div>
+          ) : (
+            <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-800/40 divide-y divide-gray-800/40">
+              {list.length === 0 && !loading && <div className="p-4 text-center text-xs text-gray-500">No matches.</div>}
+              {list.map((t) => (
+                <TrackRow key={t.path} track={t} playlists={playlists}
+                  onPlay={() => { void playFromRow(t, list); }}
+                  onPlayNext={() => onPlayNext(t)}
+                  onAddToQueue={() => onAddToQueue(t)}
+                  onAddToPlaylist={(id) => onAddToPlaylist(id, t)}
+                  onEditTags={() => onEditTags(t)} />
+              ))}
+            </div>
+          )}
 
           {dbView && list.length < total && (
             <button
@@ -317,5 +341,19 @@ export default function LibraryHome({
         </>
       )}
     </div>
+  );
+}
+
+function VideoRow({ track, onOpen }: { track: Track; onOpen: () => void }) {
+  return (
+    <button onClick={onOpen} className="cv-row w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 transition-colors">
+      <Film className="w-4 h-4 shrink-0 acc-text" />
+      <span className="flex-1 min-w-0">
+        <span className="block text-xs sm:text-sm text-gray-100 truncate">{track.title}</span>
+        <span className="block text-[11px] text-gray-500 truncate">{track.filename}</span>
+      </span>
+      <span className="text-[11px] text-gray-500 tabular-nums shrink-0">{Math.floor(track.duration / 60)}:{Math.floor(track.duration % 60).toString().padStart(2, '0')}</span>
+      <Play className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+    </button>
   );
 }
