@@ -4,6 +4,7 @@ import { runDownload, stopDownload } from './python-bridge';
 import { scanLibrary, getTrackArt, writeTrackTags, loadLibraryCache, saveLibraryCache } from './library';
 import { queryTracks, libraryStats, recordDownload } from './db';
 import { approveRoot, isApprovedFile } from './approved-paths';
+import { isVideoPath } from './path-policy';
 import { getFfmpegStatus } from './ffmpeg-status';
 import { assertTrustedSender, isTrustedSender } from './trust';
 import type { DownloadOptions, DownloadResult, LibraryQuery } from '../types/electron';
@@ -50,6 +51,16 @@ export function registerIPCHandlers(): void {
     } catch {
       return false;
     }
+  });
+
+  ipcMain.handle('system:openVideo', async (event, filePath: string) => {
+    guard(event);
+    const target = String(filePath);
+    if (!isApprovedFile(target) || !isVideoPath(target)) {
+      return { success: false, error: 'Video is outside the approved library folders' };
+    }
+    const error = await shell.openPath(target);
+    return { success: !error, error };
   });
 
   ipcMain.handle(

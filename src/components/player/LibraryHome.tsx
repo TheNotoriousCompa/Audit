@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, ChevronLeft, Music2, Users, Disc3, Tags, Clock, Film, Play } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Search, ChevronLeft, Music2, Users, Disc3, Tags, Clock, Film, Play, ExternalLink, MoreVertical } from 'lucide-react';
 import type { LibrarySort, Track } from '@/types/electron';
 import TrackRow, { PlaylistRef } from './TrackRow';
 import { isVideoTrack } from './media';
@@ -239,6 +240,19 @@ export default function LibraryHome({
     else setCat(null);
   };
 
+  const openVideoExternally = useCallback(async (track: Track) => {
+    const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+    try {
+      const result = await api?.openVideoExternally?.(track.path);
+      if (result && !result.success) {
+        window.alert(result.error || 'Could not open the default player.');
+      }
+    } catch (err) {
+      console.error('External video player failed:', err);
+      window.alert('Could not open the default player.');
+    }
+  }, []);
+
   return (
     <div className="w-full glass-inset rounded-xl p-3 sm:p-4">
       <div className="flex items-center gap-2 mb-2">
@@ -312,7 +326,12 @@ export default function LibraryHome({
             <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-800/40 divide-y divide-gray-800/40">
               {videoList.length === 0 && <div className="p-4 text-center text-xs text-gray-500">No videos.</div>}
               {videoList.map((t) => (
-                <VideoRow key={t.path} track={t} onOpen={() => onPlayVideo(t)} />
+                <VideoRow
+                  key={t.path}
+                  track={t}
+                  onPlayInAudit={() => onPlayVideo(t)}
+                  onOpenExternal={() => { void openVideoExternally(t); }}
+                />
               ))}
             </div>
           ) : (
@@ -344,16 +363,118 @@ export default function LibraryHome({
   );
 }
 
-function VideoRow({ track, onOpen }: { track: Track; onOpen: () => void }) {
+function VideoRow({
+  track,
+  onPlayInAudit,
+  onOpenExternal,
+}: {
+  track: Track;
+  onPlayInAudit: () => void;
+  onOpenExternal: () => void;
+}) {
+  const [menu, setMenu] = useState(false);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(false);
+    const closeOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
+      close();
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', closeOutside);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOutside);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [menu]);
+
+  const placeMenu = (left: number, top: number) => {
+    const width = 224;
+    const height = 88;
+    const margin = 8;
+    setPosition({
+      left: Math.max(margin, Math.min(left, window.innerWidth - width - margin)),
+      top: Math.max(margin, Math.min(top, window.innerHeight - height - margin)),
+    });
+    setMenu(true);
+  };
+
+  const openContextMenu = (event: React.MouseEvent) => {
+    event.preventDefault();
+    placeMenu(event.clientX, event.clientY);
+  };
+
+  const toggleMenu = () => {
+    const button = buttonRef.current;
+    if (!button) return;
+    if (menu) {
+      setMenu(false);
+      return;
+    }
+    const rect = button.getBoundingClientRect();
+    const width = 224;
+    const height = 88;
+    placeMenu(rect.right - width, rect.bottom + 4 > window.innerHeight - height ? rect.top - height : rect.bottom + 4);
+  };
+
   return (
-    <button onClick={onOpen} className="cv-row w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 transition-colors">
-      <Film className="w-4 h-4 shrink-0 acc-text" />
-      <span className="flex-1 min-w-0">
-        <span className="block text-xs sm:text-sm text-gray-100 truncate">{track.title}</span>
-        <span className="block text-[11px] text-gray-500 truncate">{track.filename}</span>
-      </span>
-      <span className="text-[11px] text-gray-500 tabular-nums shrink-0">{Math.floor(track.duration / 60)}:{Math.floor(track.duration % 60).toString().padStart(2, '0')}</span>
-      <Play className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-    </button>
+    <>
+      <div className="cv-row flex items-center gap-1 pr-1">
+        <button
+          onClick={onOpenExternal}
+          onContextMenu={openContextMenu}
+          className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5 text-left hover:bg-white/5 transition-colors"
+          title="Open in default player"
+        >
+          <Film className="w-4 h-4 shrink-0 acc-text" />
+          <span className="flex-1 min-w-0">
+            <span className="block text-xs sm:text-sm text-gray-100 truncate">{track.title}</span>
+            <span className="block text-[11px] text-gray-500 truncate">{track.filename}</span>
+          </span>
+          <span className="text-[11px] text-gray-500 tabular-nums shrink-0">{Math.floor(track.duration / 60)}:{Math.floor(track.duration % 60).toString().padStart(2, '0')}</span>
+        </button>
+        <button
+          ref={buttonRef}
+          onClick={toggleMenu}
+          title="Video actions"
+          className="p-1.5 rounded-lg text-gray-400 acc-hover-text transition-colors shrink-0"
+        >
+          <MoreVertical className="w-4 h-4" />
+        </button>
+      </div>
+      {menu && position && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', left: position.left, top: position.top, zIndex: 1000 }}
+          className="w-56 bg-zinc-900 border border-gray-700/60 rounded-xl shadow-2xl overflow-hidden"
+        >
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs sm:text-sm text-gray-200 hover:bg-white/5 transition-colors"
+            onClick={() => { setMenu(false); onOpenExternal(); }}
+          >
+            <ExternalLink className="w-3.5 h-3.5 text-gray-400" /> Open in default player
+          </button>
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs sm:text-sm text-gray-200 hover:bg-white/5 transition-colors"
+            onClick={() => { setMenu(false); onPlayInAudit(); }}
+          >
+            <Play className="w-3.5 h-3.5 acc-text" /> Play in Audit
+          </button>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }

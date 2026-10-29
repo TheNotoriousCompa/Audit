@@ -9,6 +9,10 @@ export function isAudioPath(filePath: string): boolean {
   return AUDIO_EXTENSIONS.has(path.extname(filePath).toLowerCase());
 }
 
+export function isVideoPath(filePath: string): boolean {
+  return path.extname(filePath).toLowerCase() === '.mp4';
+}
+
 /** Stable comparison key for a path. Windows paths are case-insensitive. */
 export function normalizePathKey(input: string): string {
   const resolved = path.normalize(path.resolve(input));

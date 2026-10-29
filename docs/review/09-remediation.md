@@ -113,6 +113,8 @@ Fuori dalle fasi 0-3, da affrontare nella fase 4:
 - I file `.mp4` sono esclusi da All Songs, Artists, Albums, Genres, Recently downloaded e Folders.
 - Nuova categoria `Videos` nella Library, con conteggio separato e ricerca dedicata.
 - `library:query` supporta `mediaType: 'music' | 'videos'`; il DB filtra `ext`.
-- Il click su un video apre un player overlay con `<video controls autoPlay>` e `media://`; l'audio del player musicale viene messo in pausa.
+- Il click sinistro su un video apre il player predefinito di sistema; il menu a tre puntini o il click destro offrono `Open in default player` e `Play in Audit`.
+- `Play in Audit` apre il player overlay con `<video controls autoPlay>` e `media://`; l'audio del player musicale viene messo in pausa.
+- Il main valida che sia un MP4 dentro le root approvate e usa `shell.openPath` per il player esterno.
 - Il protocollo serve `.mp4` come `video/mp4`.
 - La coda musicale non include i video.

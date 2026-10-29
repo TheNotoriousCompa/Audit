@@ -39,6 +39,9 @@ const electronAPI: ElectronAPI = {
   openFfmpegHelp: (): Promise<boolean> => {
     return ipcRenderer.invoke('system:ffmpegHelp');
   },
+  openVideoExternally: (filePath: string) => {
+    return ipcRenderer.invoke('system:openVideo', filePath);
+  },
   onDownloadProgress: (callback: (event: IpcRendererEvent, progress: Partial<DownloadProgress> & Record<string, unknown>) => void): void => {
     ipcRenderer.on('download-progress', callback);
   },

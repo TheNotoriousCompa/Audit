@@ -152,6 +152,11 @@ export interface FfmpegStatus {
   error: string;
 }
 
+export interface OpenMediaResult {
+  success: boolean;
+  error: string;
+}
+
 export interface WriteTagFields {
   title: string;
   artist: string;
@@ -197,6 +202,7 @@ export interface ElectronAPI {
   stopDownload: () => void;
   ffmpegStatus: (force?: boolean) => Promise<FfmpegStatus>;
   openFfmpegHelp: () => Promise<boolean>;
+  openVideoExternally: (filePath: string) => Promise<OpenMediaResult>;
 
   // Local library (player)
   scanLibrary: (dir: string) => Promise<LibraryScanResult>;

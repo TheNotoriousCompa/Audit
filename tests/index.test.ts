@@ -4,6 +4,7 @@ import path from 'node:path';
 import {
   isAudioPath,
   isPathInside,
+  isVideoPath,
   normalizePathKey,
 } from '../src/main/path-policy';
 import { JsonLineDecoder } from '../src/main/json-lines';
@@ -30,6 +31,12 @@ test('path policy: audio extension allowlist is case-insensitive', () => {
   assert.equal(isAudioPath('video.MP4'), true);
   assert.equal(isAudioPath('cover.JPG'), false);
   assert.equal(isAudioPath('no-extension'), false);
+});
+
+test('path policy: video detection is separate from audio', () => {
+  assert.equal(isVideoPath('clip.MP4'), true);
+  assert.equal(isVideoPath('clip.mp3'), false);
+  assert.equal(isVideoPath('clip.m4a'), false);
 });
 
 test('json lines: partial chunks are reassembled and CRLF is stripped', () => {
