@@ -185,6 +185,46 @@ export interface PlayerMiniState {
   hasQueue: boolean;
 }
 
+/** Declarative, offline-only theme data. No CSS or JavaScript is stored here. */
+export interface AuditThemeTokens {
+  background?: string;
+  backgroundImage?: string;
+  surface?: string;
+  surfaceStrong?: string;
+  text?: string;
+  muted?: string;
+  accent?: string;
+  accentContrast?: string;
+  border?: string;
+  fontFamily?: string;
+  radius?: number;
+  glass?: boolean;
+  waves?: boolean;
+}
+
+export interface AuditTheme {
+  schemaVersion: 1;
+  id: string;
+  name: string;
+  author?: string;
+  version?: string;
+  description?: string;
+  tokens: AuditThemeTokens;
+}
+
+export interface ThemeImportResult {
+  success: boolean;
+  themes: AuditTheme[];
+  imported?: AuditTheme;
+  error?: string;
+}
+
+export interface ThemeBackgroundResult {
+  success: boolean;
+  dataUrl?: string;
+  error?: string;
+}
+
 // Types for the Electron API
 export interface ElectronAPI {
   /** True inside the floating mini-player window (set by the preload). */
@@ -227,6 +267,14 @@ export interface ElectronAPI {
   queryMini: () => void;
   onMiniState: (cb: (open: boolean) => void) => void;
   onMiniMode: (cb: () => void) => void;
+
+  // Offline themes
+  listThemes: () => Promise<AuditTheme[]>;
+  importTheme: () => Promise<ThemeImportResult>;
+  exportTheme: (theme: AuditTheme) => Promise<boolean>;
+  deleteTheme: (id: string) => Promise<AuditTheme[]>;
+  openThemesFolder: () => Promise<boolean>;
+  pickThemeBackground: () => Promise<ThemeBackgroundResult>;
 }
 
 // Extend React CSSProperties for custom properties

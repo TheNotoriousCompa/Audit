@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "example.pixel",
+  "name": "Pixel",
+  "author": "Audit examples",
+  "version": "1.0.0",
+  "description": "A compact dark theme with square corners and a monospace UI.",
+  "tokens": {
+    "background": "#0b0b12",
+    "surface": "#181824",
+    "surfaceStrong": "#242438",
+    "text": "#f4f4ff",
+    "muted": "#9a9ab5",
+    "accent": "#7cffb2",
+    "accentContrast": "#07130c",
+    "border": "#484866",
+    "fontFamily": "\"Cascadia Mono\", Consolas, monospace",
+    "radius": 0,
+    "glass": false,
+    "waves": false
+  }
+}

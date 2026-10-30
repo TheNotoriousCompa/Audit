@@ -263,3 +263,45 @@ body {
     0 16px 40px rgba(0, 0, 0, 0.6);
   will-change: transform;
 }
+
+/* ---- Offline themes -------------------------------------------------
+   A theme is a declarative token set. These rules only reinterpret the
+   existing materials; they never load CSS or code from a theme file. */
+[data-audit-theme] .glass {
+  background-color: color-mix(in srgb, var(--theme-surface, #101012) 55%, transparent);
+  border-color: color-mix(in srgb, var(--theme-border, #ffffff) 15%, transparent);
+}
+
+[data-audit-theme] .glass-base,
+[data-audit-theme] .glass-popover {
+  background-color: color-mix(in srgb, var(--theme-surface, #101012) 82%, transparent);
+  border-color: color-mix(in srgb, var(--theme-border, #ffffff) 18%, transparent);
+}
+
+[data-audit-theme] .glass-inset {
+  background-color: color-mix(in srgb, var(--theme-surface-strong, #18181b) 55%, transparent);
+  border-color: color-mix(in srgb, var(--theme-border, #ffffff) 12%, transparent);
+}
+
+[data-audit-theme].theme-flat .glass,
+[data-audit-theme].theme-flat .glass-base,
+[data-audit-theme].theme-flat .glass-popover,
+[data-audit-theme].theme-flat .glass-inset {
+  background-color: var(--theme-surface, #101012);
+  border-color: var(--theme-border, #808080);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+[data-audit-theme].theme-flat .glass-hover:hover {
+  background-color: var(--theme-surface-strong, var(--theme-surface, #101012));
+}
+
+[data-audit-theme].theme-square .rounded,
+[data-audit-theme].theme-square .rounded-md,
+[data-audit-theme].theme-square .rounded-lg,
+[data-audit-theme].theme-square .rounded-xl,
+[data-audit-theme].theme-square .rounded-2xl {
+  border-radius: 0 !important;
+}

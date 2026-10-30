@@ -10,7 +10,8 @@ import StatusMessage from '@/components/StatusMessage';
 import PlayerSection from '@/components/player/PlayerSection';
 import MiniView from '@/components/player/MiniView';
 import Info from '@/components/sections/Info';
-import type { DownloadProgress, DownloadResult, DownloadStatus, FfmpegStatus } from '@/types/electron';
+import { DEFAULT_THEME_ID, themeClasses, themeFromColors, themeStyle } from '@/components/theme';
+import type { AuditTheme, DownloadProgress, DownloadResult, DownloadStatus, FfmpegStatus } from '@/types/electron';
 
 const defaultProgress = (overrides?: Partial<DownloadProgress>): DownloadProgress => ({
     percentage: 0,
@@ -110,6 +111,166 @@ export default function Home() {
             // session-only
         }
     }, [colors]);
+
+    const [themes, setThemes] = useState<AuditTheme[]>([]);
+    const [activeThemeId, setActiveThemeId] = useState(DEFAULT_THEME_ID);
+    const [themeMessage, setThemeMessage] = useState<string | null>(null);
+    const [backgroundOverrides, setBackgroundOverrides] = useState<Record<string, string>>({});
+    const themesLoaded = useRef(false);
+    const backgroundsLoaded = useRef(false);
+
+    useEffect(() => {
+        let live = true;
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        const saved = (() => {
+            try { return localStorage.getItem('audit-theme-id'); } catch { return null; }
+        })();
+        Promise.resolve(api?.listThemes?.())
+            .then((list) => {
+                if (!live) return;
+                const next = Array.isArray(list) ? list : [];
+                setThemes(next);
+                setActiveThemeId(saved && next.some((theme) => theme.id === saved) ? saved : DEFAULT_THEME_ID);
+            })
+            .catch(() => {
+                if (live) setThemes([]);
+            })
+            .finally(() => {
+                if (live) themesLoaded.current = true;
+            });
+        return () => { live = false; };
+    }, []);
+
+    useEffect(() => {
+        if (!themesLoaded.current) return;
+        try {
+            localStorage.setItem('audit-theme-id', activeThemeId);
+        } catch {
+            // session-only
+        }
+    }, [activeThemeId]);
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('audit-theme-backgrounds');
+            if (saved) {
+                const parsed = JSON.parse(saved) as unknown;
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    const next: Record<string, string> = {};
+                    for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+                        if (typeof value === 'string' && value.startsWith('data:image/')) next[id] = value;
+                    }
+                    setBackgroundOverrides(next);
+                }
+            }
+        } catch {
+            // use theme defaults
+        } finally {
+            backgroundsLoaded.current = true;
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!backgroundsLoaded.current) return;
+        try {
+            localStorage.setItem('audit-theme-backgrounds', JSON.stringify(backgroundOverrides));
+        } catch {
+            // session-only
+        }
+    }, [backgroundOverrides]);
+
+    const activeTheme = themes.find((theme) => theme.id === activeThemeId) || null;
+    const activeBackgroundImage = backgroundOverrides[activeThemeId] || activeTheme?.tokens.backgroundImage || null;
+    const effectiveAccent = activeTheme?.tokens.accent || colors.lineColor;
+    const effectiveBackground = activeTheme?.tokens.background || colors.backgroundColor;
+    const effectiveAccentContrast = activeTheme?.tokens.accentContrast || accentContrast(effectiveAccent);
+    const activeThemeStyle = activeTheme
+        ? {
+            ...themeStyle(activeTheme),
+            '--audit-accent': effectiveAccent,
+            '--audit-accent-contrast': effectiveAccentContrast,
+        } as React.CSSProperties
+        : {
+            '--audit-accent': effectiveAccent,
+            '--audit-accent-contrast': effectiveAccentContrast,
+        } as React.CSSProperties;
+
+    const handleSelectTheme = useCallback((id: string) => {
+        setActiveThemeId(id);
+        setThemeMessage(null);
+    }, []);
+
+    const handleImportTheme = useCallback(async () => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        if (!api?.importTheme) {
+            setThemeMessage('Theme import is unavailable in this build.');
+            return;
+        }
+        const result = await api.importTheme();
+        if (result?.success) {
+            setThemes(result.themes || []);
+            if (result.imported) {
+                setActiveThemeId(result.imported.id);
+                setThemeMessage(`Imported ${result.imported.name}`);
+            }
+        } else if (result?.error) {
+            setThemeMessage(result.error);
+        }
+    }, []);
+
+    const handleExportTheme = useCallback(async () => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        if (!api?.exportTheme) {
+            setThemeMessage('Theme export is unavailable in this build.');
+            return;
+        }
+        const theme = activeTheme
+            ? {
+                ...activeTheme,
+                tokens: { ...activeTheme.tokens, backgroundImage: activeBackgroundImage || undefined },
+            }
+            : themeFromColors(colors, activeBackgroundImage);
+        const ok = await api.exportTheme(theme);
+        setThemeMessage(ok ? 'Theme exported.' : 'Theme export canceled.');
+    }, [activeTheme, activeBackgroundImage, colors]);
+
+    const handleDeleteTheme = useCallback(async (id: string) => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        if (!api?.deleteTheme) return;
+        const next = await api.deleteTheme(id);
+        setThemes(next || []);
+        if (activeThemeId === id) setActiveThemeId(DEFAULT_THEME_ID);
+        setThemeMessage('Theme removed.');
+    }, [activeThemeId]);
+
+    const handleOpenThemesFolder = useCallback(async () => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        if (api?.openThemesFolder) await api.openThemesFolder();
+    }, []);
+
+    const handlePickBackground = useCallback(async () => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        if (!api?.pickThemeBackground) {
+            setThemeMessage('Background image selection is unavailable in this build.');
+            return;
+        }
+        const result = await api.pickThemeBackground();
+        if (result?.success && result.dataUrl) {
+            setBackgroundOverrides((prev) => ({ ...prev, [activeThemeId]: result.dataUrl as string }));
+            setThemeMessage('Background image applied. Export the theme to keep it.');
+        } else if (result?.error) {
+            setThemeMessage(result.error);
+        }
+    }, [activeThemeId]);
+
+    const handleClearBackground = useCallback(() => {
+        setBackgroundOverrides((prev) => {
+            const next = { ...prev };
+            delete next[activeThemeId];
+            return next;
+        });
+        setThemeMessage(activeTheme?.tokens.backgroundImage ? 'Using the theme background.' : 'Background image cleared.');
+    }, [activeThemeId, activeTheme]);
 
     const [progress, setProgress] = useState<DownloadProgress>(defaultProgress());
     const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
@@ -575,16 +736,19 @@ export default function Home() {
 
     return (
         <main
-            className="relative h-screen overflow-hidden"
-            style={{ '--audit-accent': colors.lineColor, '--audit-accent-contrast': accentContrast(colors.lineColor) } as React.CSSProperties}
+            data-audit-theme={activeTheme?.id}
+            className={`relative h-screen overflow-hidden ${activeTheme ? themeClasses(activeTheme) : ''}`}
+            style={activeThemeStyle}
         >
             {isMini ? (
                 <MiniView />
             ) : (
             <>
             <Background
-                lineColor={colors.lineColor}
-                backgroundColor={colors.backgroundColor}
+                waves={activeTheme?.tokens.waves !== false}
+                image={activeBackgroundImage || undefined}
+                lineColor={effectiveAccent}
+                backgroundColor={effectiveBackground}
                 className="rounded-xl"
             />
 
@@ -680,6 +844,17 @@ export default function Home() {
                                 }));
                             }}
                             currentColors={colors}
+                            themes={themes}
+                            activeThemeId={activeThemeId}
+                            onSelectTheme={handleSelectTheme}
+                            onImportTheme={handleImportTheme}
+                            onExportTheme={handleExportTheme}
+                            onDeleteTheme={handleDeleteTheme}
+                            onOpenThemesFolder={handleOpenThemesFolder}
+                            onPickBackground={handlePickBackground}
+                            onClearBackground={handleClearBackground}
+                            hasBackgroundImage={Boolean(activeBackgroundImage)}
+                            message={themeMessage}
                         />
                     )}
                     {showInfo && (
@@ -925,7 +1100,7 @@ export default function Home() {
                         )}
                         </div>
                         <div ref={libraryRef} className={tab === 'library' ? 'flex flex-col gap-5' : 'hidden'}>
-                        <PlayerSection outputFolder={outputFolder} lineColor={colors.lineColor} harvest={harvest} onHarvestDone={clearHarvest} />
+                        <PlayerSection outputFolder={outputFolder} lineColor={effectiveAccent} harvest={harvest} onHarvestDone={clearHarvest} />
                         </div>
                         <Footer />
                     </div>

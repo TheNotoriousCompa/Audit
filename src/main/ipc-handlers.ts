@@ -7,7 +7,8 @@ import { approveRoot, isApprovedFile } from './approved-paths';
 import { isVideoPath } from './path-policy';
 import { getFfmpegStatus } from './ffmpeg-status';
 import { assertTrustedSender, isTrustedSender } from './trust';
-import type { DownloadOptions, DownloadResult, LibraryQuery } from '../types/electron';
+import { listThemes, importTheme, exportTheme, deleteTheme, openThemesFolder, pickThemeBackground } from './theme-store';
+import type { AuditTheme, DownloadOptions, DownloadResult, LibraryQuery } from '../types/electron';
 
 function guard(event: IpcMainInvokeEvent): void {
   assertTrustedSender(event, false);
@@ -120,6 +121,31 @@ export function registerIPCHandlers(): void {
       album: typeof f.album === 'string' ? f.album : '',
       genre: typeof f.genre === 'string' ? f.genre : '',
     });
+  });
+
+  ipcMain.handle('theme:list', (event) => {
+    guard(event);
+    return listThemes();
+  });
+  ipcMain.handle('theme:import', (event) => {
+    guard(event);
+    return importTheme(getMainWindow());
+  });
+  ipcMain.handle('theme:export', (event, theme: AuditTheme) => {
+    guard(event);
+    return exportTheme(getMainWindow(), theme);
+  });
+  ipcMain.handle('theme:delete', (event, id: string) => {
+    guard(event);
+    return deleteTheme(String(id));
+  });
+  ipcMain.handle('theme:openFolder', (event) => {
+    guard(event);
+    return openThemesFolder();
+  });
+  ipcMain.handle('theme:pickBackground', (event) => {
+    guard(event);
+    return pickThemeBackground(getMainWindow());
   });
 
   ipcMain.on('window:minimize', (event) => {

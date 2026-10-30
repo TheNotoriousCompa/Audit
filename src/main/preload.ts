@@ -1,9 +1,9 @@
-// preload.ts
+﻿// preload.ts
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 // Importa i tipi dal file centrale
-import type { DownloadProgress, DownloadOptions, ElectronAPI, LibraryScanResult, TrackArt, MiniCommand, PlayerMiniState, WriteTagFields, WriteTagResult, LibraryCache, LibraryQuery, LibraryQueryResult, LibraryStats } from '../types/electron.d.ts';
+import type { DownloadProgress, DownloadOptions, ElectronAPI, LibraryScanResult, TrackArt, MiniCommand, PlayerMiniState, WriteTagFields, WriteTagResult, LibraryCache, LibraryQuery, LibraryQueryResult, LibraryStats, AuditTheme, ThemeImportResult, ThemeBackgroundResult } from '../types/electron.d.ts';
 
-// Log che preload script è caricato
+// Log che preload script Ã¨ caricato
 console.log('Preload script loaded');
 
 // The mini window is tagged at creation time via additionalArguments, so the
@@ -110,6 +110,24 @@ const electronAPI: ElectronAPI = {
   },
   onMiniMode: (cb: () => void): void => {
     ipcRenderer.once('mini:mode', () => cb());
+  },
+  listThemes: (): Promise<AuditTheme[]> => {
+    return ipcRenderer.invoke('theme:list');
+  },
+  importTheme: (): Promise<ThemeImportResult> => {
+    return ipcRenderer.invoke('theme:import');
+  },
+  exportTheme: (theme: AuditTheme): Promise<boolean> => {
+    return ipcRenderer.invoke('theme:export', theme);
+  },
+  deleteTheme: (id: string): Promise<AuditTheme[]> => {
+    return ipcRenderer.invoke('theme:delete', id);
+  },
+  openThemesFolder: (): Promise<boolean> => {
+    return ipcRenderer.invoke('theme:openFolder');
+  },
+  pickThemeBackground: (): Promise<ThemeBackgroundResult> => {
+    return ipcRenderer.invoke('theme:pickBackground');
   }
 };
 
