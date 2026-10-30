@@ -410,38 +410,48 @@ function PlayerSectionInner({ outputFolder, lineColor, harvest, onHarvestDone }:
       .catch(() => miniArtCache.current.set(path, null));
   }, [current?.path]);
 
+  const sendMiniState = useCallback((repeatArt = false) => {
+    const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+    if (!api?.sendPlayerState) return;
+    const dur = audioEl && isFinite(audioEl.duration) && audioEl.duration > 0
+      ? audioEl.duration
+      : current?.duration || 0;
+    const path = current?.path || null;
+    const art = path ? miniArtCache.current.get(path) ?? null : null;
+    const changed = path !== lastSentArtPath.current || art !== lastSentArt.current;
+    const includeArt = changed || repeatArt;
+    if (includeArt) {
+      lastSentArtPath.current = path;
+      lastSentArt.current = art;
+    }
+    api.sendPlayerState({
+      playing,
+      title: current?.title || '',
+      artist: current?.artist || '',
+      pos: audioEl?.currentTime ?? 0,
+      dur,
+      vol: volume,
+      accent: lineColor,
+      art: includeArt ? art : null,
+      artPath: path,
+      hasQueue: queue.length > 0,
+    });
+  }, [playing, current, queue.length, audioEl, volume, lineColor]);
+
+  // Push the authoritative state immediately when a control changes, so the
+  // mini player does not have to wait for the next progress tick.
+  useEffect(() => {
+    sendMiniState(false);
+  }, [sendMiniState]);
+
   useEffect(() => {
     let tick = 0;
     const id = setInterval(() => {
       tick += 1;
-      const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
-      if (!api?.sendPlayerState) return;
-      const dur = audioEl && isFinite(audioEl.duration) && audioEl.duration > 0
-        ? audioEl.duration
-        : current?.duration || 0;
-      const path = current?.path || null;
-      const art = path ? miniArtCache.current.get(path) ?? null : null;
-      const changed = path !== lastSentArtPath.current || art !== lastSentArt.current;
-      const includeArt = changed || tick % 5 === 0;
-      if (includeArt) {
-        lastSentArtPath.current = path;
-        lastSentArt.current = art;
-      }
-      api.sendPlayerState({
-        playing,
-        title: current?.title || '',
-        artist: current?.artist || '',
-        pos: audioEl?.currentTime ?? 0,
-        dur,
-        vol: volume,
-        accent: lineColor,
-        art: includeArt ? art : null,
-        artPath: path,
-        hasQueue: queue.length > 0,
-      });
-    }, 1000);
+      sendMiniState(tick % 20 === 0);
+    }, 250);
     return () => clearInterval(id);
-  }, [playing, current, queue.length, audioEl, volume, lineColor]);
+  }, [sendMiniState]);
 
   const nav: { id: View; label: string; Icon: typeof Disc3 }[] = [
     { id: 'player', label: 'Player', Icon: Disc3 },

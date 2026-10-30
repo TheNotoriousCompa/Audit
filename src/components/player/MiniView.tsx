@@ -59,12 +59,23 @@ export default function MiniView() {
   const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
   const pct = state && state.dur > 0 ? Math.min(100, (state.pos / state.dur) * 100) : 0;
 
+  const patchLocal = (patch: Partial<PlayerMiniState>) => {
+    setState((prev) => (prev ? { ...prev, ...patch } : prev));
+  };
+
+  const togglePlayback = () => {
+    patchLocal({ playing: !state?.playing });
+    api?.miniControl?.('toggle');
+  };
+
   const seekFromClick = (e: React.MouseEvent) => {
     const bar = barRef.current;
     if (!bar || !state || state.dur <= 0) return;
     const rect = bar.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    api?.miniControl?.({ type: 'seek', pos: ratio * state.dur });
+    const pos = ratio * state.dur;
+    patchLocal({ pos });
+    api?.miniControl?.({ type: 'seek', pos });
   };
 
   const noDrag = { WebkitAppRegion: 'no-drag' } as React.CSSProperties;
@@ -146,7 +157,7 @@ export default function MiniView() {
         </button>
 
         <button
-          onClick={() => api?.miniControl?.('toggle')}
+          onClick={togglePlayback}
           title={state?.playing ? 'Pause' : 'Play'}
           className="w-9 h-9 rounded-full flex items-center justify-center transition-transform hover:scale-105"
           style={{ backgroundColor: 'var(--audit-accent)', color: '#0b0b0d' }}
@@ -169,7 +180,11 @@ export default function MiniView() {
           <Volume2 className="w-3.5 h-3.5 text-gray-500" />
           <input
             type="range" min={0} max={1} step={0.01} value={state?.vol ?? 0.9}
-            onChange={(e) => api?.miniControl?.({ type: 'volume', vol: Number(e.target.value) })}
+            onChange={(e) => {
+              const vol = Number(e.target.value);
+              patchLocal({ vol });
+              api?.miniControl?.({ type: 'volume', vol });
+            }}
             className="w-12 h-1 cursor-pointer mini-vol"
           />
         </span>
