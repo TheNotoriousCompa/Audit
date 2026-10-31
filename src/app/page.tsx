@@ -73,6 +73,7 @@ export default function Home() {
     const [showDownloads, setShowDownloads] = useState(false);
     const [showUpdate, setShowUpdate] = useState(false);
     const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+    const [dismissedUpdate, setDismissedUpdate] = useState<string | null>(null);
 
     // Server and client must render the same first paint: reading
     // localStorage in a useState initializer caused a hydration mismatch
@@ -258,7 +259,23 @@ export default function Home() {
     }, []);
 
     useEffect(() => {
+        try {
+            setDismissedUpdate(localStorage.getItem('audit-update-dismissed'));
+        } catch {
+            // no dismissal memory
+        }
+    }, []);
+
+    useEffect(() => {
         if (!updateState) return;
+        if (
+            updateState.status === 'available'
+            && updateState.availableVersion
+            && dismissedUpdate !== updateState.availableVersion
+        ) {
+            setShowUpdate(true);
+            return;
+        }
         if (
             updateState.status === 'available'
             || updateState.status === 'downloading'
@@ -266,7 +283,19 @@ export default function Home() {
             || updateState.status === 'error'
         ) return;
         setShowUpdate(false);
-    }, [updateState]);
+    }, [updateState, dismissedUpdate]);
+
+    const dismissUpdate = useCallback(() => {
+        if (updateState?.availableVersion) {
+            try {
+                localStorage.setItem('audit-update-dismissed', updateState.availableVersion);
+            } catch {
+                // session-only
+            }
+            setDismissedUpdate(updateState.availableVersion);
+        }
+        setShowUpdate(false);
+    }, [updateState?.availableVersion]);
 
     const handleUpdateDownload = useCallback(async () => {
         const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
@@ -909,7 +938,7 @@ export default function Home() {
                                     : 'Update available'}
                         </h2>
                         <button
-                            onClick={() => setShowUpdate(false)}
+                            onClick={dismissUpdate}
                             className="ml-auto p-1 rounded-lg text-gray-500 acc-hover-text transition-colors"
                             title="Close"
                         >
@@ -935,7 +964,7 @@ export default function Home() {
                                     Download update
                                 </button>
                                 <button
-                                    onClick={() => setShowUpdate(false)}
+                                    onClick={dismissUpdate}
                                     className="px-2 py-1.5 rounded-lg text-[11px] text-gray-400 hover:text-white transition-colors"
                                 >
                                     Later
@@ -964,7 +993,7 @@ export default function Home() {
                                     Restart and install
                                 </button>
                                 <button
-                                    onClick={() => setShowUpdate(false)}
+                                    onClick={dismissUpdate}
                                     className="px-2 py-1.5 rounded-lg text-[11px] text-gray-400 hover:text-white transition-colors"
                                 >
                                     Later
@@ -986,7 +1015,7 @@ export default function Home() {
                                     Try again
                                 </button>
                                 <button
-                                    onClick={() => setShowUpdate(false)}
+                                    onClick={dismissUpdate}
                                     className="px-2 py-1.5 rounded-lg text-[11px] text-gray-400 hover:text-white transition-colors"
                                 >
                                     Close
@@ -1115,7 +1144,7 @@ export default function Home() {
                             <ArrowDownToLine className={`w-5 h-5 shrink-0 transition-colors ${tab === 'download' ? 'acc-on-accent' : 'text-gray-500'}`} />
                             <span className="min-w-0">
                                 <span className={`block text-xs sm:text-sm font-semibold transition-colors ${tab === 'download' ? 'acc-on-accent' : 'text-gray-300'}`}>Downloader</span>
-                                <span className="block text-[10px] sm:text-[11px] text-gray-500 truncate">YouTube → audio files</span>
+                                <span className="block text-[10px] sm:text-[11px] text-gray-500 truncate">YouTube â†’ audio files</span>
                             </span>
                         </button>
                         <button onClick={() => switchTab('library')}

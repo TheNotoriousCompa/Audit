@@ -358,38 +358,74 @@ body {
 }
 
 [data-audit-theme].theme-win98 .win98-titlebar {
-  background: linear-gradient(90deg, #000080, #1084d0);
+  height: 3.5rem;
+  padding: 0;
+  background: linear-gradient(#000080 0 1.5rem, #c0c0c0 1.5rem 100%);
   border: 1px solid #000000;
-  box-shadow: none;
+  box-shadow:
+    inset -1px -1px #0a0a0a,
+    inset 1px 1px #dfdfdf;
   color: #ffffff;
+}
+
+[data-audit-theme].theme-win98 .win98-titlebar::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 3px;
+  width: 16px;
+  height: 16px;
+  background-image: url('/AUDIT.png');
+  background-size: 16px 16px;
+  image-rendering: pixelated;
 }
 
 [data-audit-theme].theme-win98 .win98-titlebar::after {
   content: 'Audit';
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 26px;
+  top: 3px;
   color: #ffffff;
-  font-weight: 700;
+  font: 700 11px Tahoma, sans-serif;
   letter-spacing: 0;
   pointer-events: none;
 }
 
+[data-audit-theme].theme-win98 .win98-window-controls {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  height: 20px;
+  gap: 2px;
+}
+
 [data-audit-theme].theme-win98 .win98-window-controls > * + * {
-  margin-left: 2px !important;
+  margin-left: 0 !important;
+}
+
+[data-audit-theme].theme-win98 .win98-toolbar {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  height: 1.75rem;
+  padding: 0 2px;
+  background: #c0c0c0;
+  border-top: 1px solid #ffffff;
+  border-bottom: 1px solid #808080;
 }
 
 [data-audit-theme].theme-win98 .win98-toolbar button {
   background: transparent;
   box-shadow: none;
   border: 0;
-  color: #ffffff;
+  color: #000000;
   min-height: 22px;
   padding: 2px;
 }
 
 [data-audit-theme].theme-win98 .win98-toolbar button svg {
-  color: #ffffff;
+  color: #000000;
 }
 
 [data-audit-theme].theme-win98 .win98-window-controls button {

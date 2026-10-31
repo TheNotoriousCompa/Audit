@@ -5,7 +5,8 @@ Audit uses a user-controlled update flow.
 ## What happens
 
 1. The installed app checks the latest GitHub release in the background. The portable ZIP does not check.
-2. If a newer version exists, the title bar shows an update button.
+2. If a newer version exists, Audit opens a small update notification and shows an update button in the title bar.
+   Dismissing the notification remembers that version, so it does not reopen on every launch.
 3. Nothing is downloaded until the user presses **Download update**.
 4. After the download, the button changes state. The user can choose **Restart and install** or **Later**.
 5. User data in `%APPDATA%\Audit` is not replaced by an update: the database, settings, themes and music files stay in place.
