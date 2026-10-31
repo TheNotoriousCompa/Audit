@@ -4,7 +4,7 @@
   "name": "Pixel",
   "author": "Audit examples",
   "version": "1.0.0",
-  "description": "A compact dark theme with square corners and a monospace UI.",
+  "description": "A dark pixel theme with a bundled pixel font, hard borders and a subtle grid.",
   "tokens": {
     "background": "#0b0b12",
     "surface": "#181824",
@@ -14,9 +14,10 @@
     "accent": "#7cffb2",
     "accentContrast": "#07130c",
     "border": "#484866",
-    "fontFamily": "\"Cascadia Mono\", Consolas, monospace",
+    "fontFamily": "\"Audit Pixel\", monospace",
     "radius": 0,
     "glass": false,
-    "waves": false
+    "waves": false,
+    "decor": "pixel"
   }
 }

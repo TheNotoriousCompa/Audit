@@ -200,6 +200,7 @@ export interface AuditThemeTokens {
   radius?: number;
   glass?: boolean;
   waves?: boolean;
+  decor?: 'pixel';
 }
 
 export interface AuditTheme {

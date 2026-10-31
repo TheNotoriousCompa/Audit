@@ -74,6 +74,10 @@ function readTheme(raw: unknown): AuditTheme | null {
       tokens[key] = Boolean(t[key]);
     }
   }
+  if (t.decor !== undefined) {
+    if (t.decor !== 'pixel') return null;
+    tokens.decor = t.decor;
+  }
 
   const theme: AuditTheme = { schemaVersion: 1, id, name, tokens };
   if (typeof value.author === 'string' && value.author.trim()) theme.author = value.author.trim().slice(0, 80);

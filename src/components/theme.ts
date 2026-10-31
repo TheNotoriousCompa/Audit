@@ -57,6 +57,7 @@ export function themeClasses(theme: AuditTheme): string {
   const classes: string[] = [];
   if (theme.tokens.glass === false) classes.push('theme-flat');
   if ((theme.tokens.radius ?? 10) === 0) classes.push('theme-square');
+  if (theme.tokens.decor === 'pixel') classes.push('theme-pixel');
   return classes.join(' ');
 }
 

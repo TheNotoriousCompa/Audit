@@ -47,6 +47,8 @@ Only the values above are accepted. Colors use hex notation. Themes cannot load 
 - `radius: 0` and `glass: false` are the useful combination for pixel and retro styles.
 - `waves: false` hides the animated background.
 - `backgroundImage` accepts a self-contained `data:image/jpeg`, `data:image/png` or `data:image/webp` URL. Remote URLs are rejected.
-- Fonts must already be installed on the machine. Asset packaging is a future step.
+- `decor: "pixel"` enables chunky borders, a grid and pixel image rendering. It is a built-in decorator, not custom CSS.
+- The Pixel example uses the bundled OFL `Audit Pixel` font from `Public/fonts/Silkscreen-Regular.ttf`.
+- Other fonts must already be installed on the machine. Asset packaging is a future step.
 - The Retro 98 example wallpaper is a free Pexels photo (ID 38130723) used under the Pexels license.
 

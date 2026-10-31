@@ -66,6 +66,15 @@ body {
   background-color: transparent;
 }
 
+/* Pixel themes use a bundled OFL font so the look survives offline. */
+@font-face {
+  font-family: 'Audit Pixel';
+  src: url('/fonts/Silkscreen-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Mini player marquee for long titles ( Poweramp Bar design ). */
 @keyframes mini-marquee-scroll {
   0%, 15% {
@@ -295,6 +304,37 @@ body {
 }
 
 [data-audit-theme].theme-flat .glass-hover:hover {
+  background-color: var(--theme-surface-strong, var(--theme-surface, #101012));
+}
+
+/* Pixel decor: chunky borders, hard shadows and a tiny grid.
+   This is still only CSS driven by the theme class, not theme-provided CSS. */
+[data-audit-theme].theme-pixel .glass,
+[data-audit-theme].theme-pixel .glass-base,
+[data-audit-theme].theme-pixel .glass-popover,
+[data-audit-theme].theme-pixel .glass-inset {
+  border-width: 2px;
+  border-color: var(--theme-border, #484866);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.7);
+}
+
+[data-audit-theme].theme-pixel > div:first-child {
+  background-image:
+    linear-gradient(rgba(124, 255, 178, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 255, 178, 0.055) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+[data-audit-theme].theme-pixel button {
+  border-radius: 0 !important;
+  letter-spacing: 0.025em;
+}
+
+[data-audit-theme].theme-pixel img {
+  image-rendering: pixelated;
+}
+
+[data-audit-theme].theme-pixel .glass-hover:hover {
   background-color: var(--theme-surface-strong, var(--theme-surface, #101012));
 }
 
