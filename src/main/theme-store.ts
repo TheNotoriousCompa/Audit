@@ -1,4 +1,4 @@
-﻿import { app, dialog, nativeImage, shell, type BrowserWindow, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
+import { app, dialog, nativeImage, shell, type BrowserWindow, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import type { AuditTheme, AuditThemeTokens, ThemeBackgroundResult, ThemeImportResult } from '../types/electron';
@@ -75,7 +75,7 @@ function readTheme(raw: unknown): AuditTheme | null {
     }
   }
   if (t.decor !== undefined) {
-    if (t.decor !== 'pixel') return null;
+    if (t.decor !== 'pixel' && t.decor !== 'win98') return null;
     tokens.decor = t.decor;
   }
 
@@ -204,6 +204,3 @@ export async function openThemesFolder(): Promise<boolean> {
     return false;
   }
 }
-
-
-

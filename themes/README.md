@@ -1,4 +1,4 @@
-﻿# Audit themes
+# Audit themes
 
 Audit themes are local JSON files. The app does not download themes and does not execute CSS or JavaScript from them.
 
@@ -48,7 +48,8 @@ Only the values above are accepted. Colors use hex notation. Themes cannot load 
 - `waves: false` hides the animated background.
 - `backgroundImage` accepts a self-contained `data:image/jpeg`, `data:image/png` or `data:image/webp` URL. Remote URLs are rejected.
 - `decor: "pixel"` enables chunky borders, a grid and pixel image rendering. It is a built-in decorator, not custom CSS.
+- `decor: "win98"` enables beveled panels, title-bar colors, sunken fields, square buttons and classic scrollbars.
 - The Pixel example uses the bundled OFL `Audit Pixel` font from `Public/fonts/Silkscreen-Regular.ttf`.
+- The Win98 decor is inspired by [98.css](https://github.com/jdan/98.css), MIT licensed. The license is included in this folder.
 - Other fonts must already be installed on the machine. Asset packaging is a future step.
 - The Retro 98 example wallpaper is a free Pexels photo (ID 38130723) used under the Pexels license.
-

@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -336,6 +336,145 @@ body {
 
 [data-audit-theme].theme-pixel .glass-hover:hover {
   background-color: var(--theme-surface-strong, var(--theme-surface, #101012));
+}
+
+/* Windows 98 decor, based on the bevel and title-bar vocabulary of
+   98.css by Jordan Scales (MIT). No 98.css file is shipped; these are
+   theme-scoped adaptations for the existing Audit components. */
+[data-audit-theme].theme-win98 .glass,
+[data-audit-theme].theme-win98 .glass-base,
+[data-audit-theme].theme-win98 .glass-popover,
+[data-audit-theme].theme-win98 .glass-inset {
+  background-color: var(--theme-surface, #c0c0c0);
+  border: 1px solid #0a0a0a;
+  box-shadow:
+    inset -1px -1px #0a0a0a,
+    inset 1px 1px #dfdfdf,
+    inset -2px -2px #808080,
+    inset 2px 2px #ffffff;
+  border-radius: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+[data-audit-theme].theme-win98 .win98-titlebar {
+  background: linear-gradient(90deg, #000080, #1084d0);
+  border: 1px solid #000000;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+[data-audit-theme].theme-win98 .win98-titlebar::after {
+  content: 'Audit';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+[data-audit-theme].theme-win98 .win98-window-controls > * + * {
+  margin-left: 2px !important;
+}
+
+[data-audit-theme].theme-win98 .win98-toolbar button {
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  color: #ffffff;
+  min-height: 22px;
+  padding: 2px;
+}
+
+[data-audit-theme].theme-win98 .win98-toolbar button svg {
+  color: #ffffff;
+}
+
+[data-audit-theme].theme-win98 .win98-window-controls button {
+  background-color: #c0c0c0;
+  box-shadow:
+    inset -1px -1px #0a0a0a,
+    inset 1px 1px #ffffff,
+    inset -2px -2px #808080,
+    inset 2px 2px #dfdfdf;
+  color: #000000;
+  min-height: 14px;
+  min-width: 16px;
+  padding: 0 2px;
+}
+
+[data-audit-theme].theme-win98 .win98-window-controls button svg {
+  color: #000000;
+}
+
+[data-audit-theme].theme-win98 button {
+  background-color: #c0c0c0;
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    inset -1px -1px #0a0a0a,
+    inset 1px 1px #ffffff,
+    inset -2px -2px #808080,
+    inset 2px 2px #dfdfdf;
+  color: #000000;
+  min-height: 22px;
+  text-shadow: 0 0 #222222;
+}
+
+[data-audit-theme].theme-win98 button:not(:disabled):active {
+  box-shadow:
+    inset -1px -1px #ffffff,
+    inset 1px 1px #0a0a0a,
+    inset -2px -2px #dfdfdf,
+    inset 2px 2px #808080;
+  text-shadow: 1px 1px #222222;
+}
+
+[data-audit-theme].theme-win98 button:focus {
+  outline: 1px dotted #000000;
+  outline-offset: -4px;
+}
+
+[data-audit-theme].theme-win98 input[type='text'],
+[data-audit-theme].theme-win98 input[type='search'],
+[data-audit-theme].theme-win98 input[type='email'],
+[data-audit-theme].theme-win98 input[type='password'],
+[data-audit-theme].theme-win98 textarea,
+[data-audit-theme].theme-win98 select {
+  background-color: #ffffff;
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    inset -1px -1px #ffffff,
+    inset 1px 1px #808080,
+    inset -2px -2px #dfdfdf,
+    inset 2px 2px #0a0a0a;
+  color: #000000;
+}
+
+[data-audit-theme].theme-win98 input[type='range'] {
+  accent-color: #000080;
+}
+
+[data-audit-theme].theme-win98 ::-webkit-scrollbar {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+[data-audit-theme].theme-win98 ::-webkit-scrollbar-track {
+  background: #c0c0c0;
+}
+
+[data-audit-theme].theme-win98 ::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  box-shadow:
+    inset -1px -1px #0a0a0a,
+    inset 1px 1px #ffffff,
+    inset -2px -2px #808080,
+    inset 2px 2px #dfdfdf;
 }
 
 [data-audit-theme].theme-square .rounded,

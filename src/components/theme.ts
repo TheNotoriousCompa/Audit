@@ -58,6 +58,7 @@ export function themeClasses(theme: AuditTheme): string {
   if (theme.tokens.glass === false) classes.push('theme-flat');
   if ((theme.tokens.radius ?? 10) === 0) classes.push('theme-square');
   if (theme.tokens.decor === 'pixel') classes.push('theme-pixel');
+  if (theme.tokens.decor === 'win98') classes.push('theme-win98');
   return classes.join(' ');
 }
 

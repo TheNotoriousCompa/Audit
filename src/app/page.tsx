@@ -754,12 +754,12 @@ export default function Home() {
 
             {/* Draggable Header with Native Window Controls */}
             <div
-                className="absolute top-2 left-2 right-2 h-10 flex items-center justify-between px-3 glass-base z-50 rounded-xl"
+                className="absolute top-2 left-2 right-2 h-10 flex items-center justify-between px-3 glass-base win98-titlebar z-50 rounded-xl"
                 style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             >
 
                 {/* App Controls - Left Side (global: style + info popovers) */}
-                <div style={{ WebkitAppRegion: 'no-drag' }} className="flex items-center space-x-2 group">
+                <div style={{ WebkitAppRegion: 'no-drag' }} className="flex items-center space-x-2 group win98-toolbar">
                     <button
                         onClick={() => {
                             setShowPersonalize(!showPersonalize);
@@ -803,7 +803,7 @@ export default function Home() {
                 </div>
 
                 {/* Window Controls - Right Side */}
-                <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} className="flex items-center space-x-4">
+                <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} className="flex items-center space-x-4 win98-window-controls">
                     <button
                         onClick={() => window.electronAPI?.windowMinimize?.()}
                         className="p-1 text-gray-300 acc-hover-text transition-colors"
