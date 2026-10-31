@@ -200,7 +200,7 @@ export interface AuditThemeTokens {
   radius?: number;
   glass?: boolean;
   waves?: boolean;
-  decor?: 'pixel' | 'win98';
+  decor?: 'pixel' | 'win98' | 'aero';
 }
 
 export interface AuditTheme {

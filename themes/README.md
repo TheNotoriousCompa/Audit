@@ -49,6 +49,7 @@ Only the values above are accepted. Colors use hex notation. Themes cannot load 
 - `backgroundImage` accepts a self-contained `data:image/jpeg`, `data:image/png` or `data:image/webp` URL. Remote URLs are rejected.
 - `decor: "pixel"` enables chunky borders, a grid and pixel image rendering. It is a built-in decorator, not custom CSS.
 - `decor: "win98"` enables beveled panels, title-bar colors, sunken fields, square buttons and classic scrollbars.
+- `decor: "aero"` enables the glossy Vista / Frutiger Aero glass treatment.
 - The Pixel example uses the bundled OFL `Audit Pixel` font from `Public/fonts/Silkscreen-Regular.ttf`.
 - The Win98 decor is inspired by [98.css](https://github.com/jdan/98.css), MIT licensed. The license is included in this folder.
 - Other fonts must already be installed on the machine. Asset packaging is a future step.

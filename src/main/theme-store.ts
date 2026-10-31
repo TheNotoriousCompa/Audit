@@ -75,7 +75,7 @@ function readTheme(raw: unknown): AuditTheme | null {
     }
   }
   if (t.decor !== undefined) {
-    if (t.decor !== 'pixel' && t.decor !== 'win98') return null;
+    if (t.decor !== 'pixel' && t.decor !== 'win98' && t.decor !== 'aero') return null;
     tokens.decor = t.decor;
   }
 
@@ -98,14 +98,40 @@ function readThemeFile(filePath: string): AuditTheme | null {
   }
 }
 
+function seedBundledThemes(): void {
+  try {
+    const bundledDir = path.join(app.getAppPath(), 'themes');
+    if (!fs.existsSync(bundledDir)) return;
+    const dir = ensureThemesDir();
+    const existingIds = new Set<string>();
+    for (const name of fs.readdirSync(dir)) {
+      if (!name.toLowerCase().endsWith('.json')) continue;
+      const existing = readThemeFile(path.join(dir, name));
+      if (existing) existingIds.add(existing.id);
+    }
+    for (const name of fs.readdirSync(bundledDir)) {
+      if (!name.toLowerCase().endsWith('.json')) continue;
+      const theme = readThemeFile(path.join(bundledDir, name));
+      if (!theme || existingIds.has(theme.id)) continue;
+      fs.writeFileSync(path.join(dir, `${theme.id}.json`), JSON.stringify(theme, null, 2), 'utf8');
+      existingIds.add(theme.id);
+    }
+  } catch {
+    // bundled samples are optional
+  }
+}
+
 export function listThemes(): AuditTheme[] {
   try {
+    seedBundledThemes();
     const dir = ensureThemesDir();
-    return fs.readdirSync(dir)
-      .filter((name) => name.toLowerCase().endsWith('.json'))
-      .map((name) => readThemeFile(path.join(dir, name)))
-      .filter((theme): theme is AuditTheme => Boolean(theme))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const themes = new Map<string, AuditTheme>();
+    for (const name of fs.readdirSync(dir)) {
+      if (!name.toLowerCase().endsWith('.json')) continue;
+      const theme = readThemeFile(path.join(dir, name));
+      if (theme && !themes.has(theme.id)) themes.set(theme.id, theme);
+    }
+    return [...themes.values()].sort((a, b) => a.name.localeCompare(b.name));
   } catch {
     return [];
   }

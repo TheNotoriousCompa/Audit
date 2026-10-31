@@ -820,7 +820,7 @@ export default function Home() {
 
             {/* Draggable Header with Native Window Controls */}
             <div
-                className="absolute top-2 left-2 right-2 h-10 flex items-center justify-between px-3 glass-base win98-titlebar z-50 rounded-xl"
+                className="absolute top-2 left-2 right-2 h-10 flex items-center justify-between px-3 glass-base app-titlebar win98-titlebar z-50 rounded-xl"
                 style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             >
 
