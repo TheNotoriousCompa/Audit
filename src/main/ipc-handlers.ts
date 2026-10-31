@@ -8,6 +8,7 @@ import { isVideoPath } from './path-policy';
 import { getFfmpegStatus } from './ffmpeg-status';
 import { assertTrustedSender, isTrustedSender } from './trust';
 import { listThemes, importTheme, exportTheme, deleteTheme, openThemesFolder, pickThemeBackground } from './theme-store';
+import { getUpdateState, checkForUpdates, downloadUpdate, restartForUpdate } from './auto-updater';
 import type { AuditTheme, DownloadOptions, DownloadResult, LibraryQuery } from '../types/electron';
 
 function guard(event: IpcMainInvokeEvent): void {
@@ -146,6 +147,23 @@ export function registerIPCHandlers(): void {
   ipcMain.handle('theme:pickBackground', (event) => {
     guard(event);
     return pickThemeBackground(getMainWindow());
+  });
+
+  ipcMain.handle('update:getState', (event) => {
+    guard(event);
+    return getUpdateState();
+  });
+  ipcMain.handle('update:check', (event) => {
+    guard(event);
+    return checkForUpdates();
+  });
+  ipcMain.handle('update:download', (event) => {
+    guard(event);
+    return downloadUpdate();
+  });
+  ipcMain.handle('update:restart', (event) => {
+    guard(event);
+    return restartForUpdate();
   });
 
   ipcMain.on('window:minimize', (event) => {

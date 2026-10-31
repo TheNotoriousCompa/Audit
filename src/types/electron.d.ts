@@ -226,6 +226,26 @@ export interface ThemeBackgroundResult {
   error?: string;
 }
 
+export type UpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'not-available'
+  | 'available'
+  | 'downloading'
+  | 'ready'
+  | 'error'
+  | 'unsupported';
+
+export interface UpdateState {
+  status: UpdateStatus;
+  currentVersion: string;
+  availableVersion?: string;
+  releaseNotes?: string;
+  releaseUrl?: string;
+  error?: string;
+  canAutoUpdate: boolean;
+}
+
 // Types for the Electron API
 export interface ElectronAPI {
   /** True inside the floating mini-player window (set by the preload). */
@@ -276,6 +296,13 @@ export interface ElectronAPI {
   deleteTheme: (id: string) => Promise<AuditTheme[]>;
   openThemesFolder: () => Promise<boolean>;
   pickThemeBackground: () => Promise<ThemeBackgroundResult>;
+
+  // Manual update flow. Nothing is downloaded until the user asks for it.
+  getUpdateState: () => Promise<UpdateState>;
+  checkForUpdates: () => Promise<UpdateState>;
+  downloadUpdate: () => Promise<UpdateState>;
+  restartForUpdate: () => Promise<boolean>;
+  onUpdateState: (cb: (state: UpdateState) => void) => void;
 }
 
 // Extend React CSSProperties for custom properties

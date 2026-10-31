@@ -20,7 +20,6 @@ const config = {
           'electron-is-dev',
           'electron-serve',
           'electron-squirrel-startup',
-          'update-electron-app',
           'better-sqlite3',
           'bindings',
           'file-uri-to-path',
@@ -125,6 +124,18 @@ const config = {
     {
       name: '@electron-forge/maker-zip',
       platforms: ['win32', 'darwin'],
+    },
+    {
+      name: '@electron-forge/maker-squirrel',
+      platforms: ['win32'],
+      config: {
+        name: 'Audit',
+        authors: 'TheNotoriousCompa',
+        description: 'Audit music downloader and player',
+        noMsi: true,
+        setupExe: 'AuditSetup.exe',
+        setupIcon: path.join(__dirname, 'src', 'app', 'favicon.ico'),
+      },
     }
   ],
   plugins: [

@@ -11,7 +11,7 @@ import PlayerSection from '@/components/player/PlayerSection';
 import MiniView from '@/components/player/MiniView';
 import Info from '@/components/sections/Info';
 import { DEFAULT_THEME_ID, themeClasses, themeFromColors, themeStyle } from '@/components/theme';
-import type { AuditTheme, DownloadProgress, DownloadResult, DownloadStatus, FfmpegStatus } from '@/types/electron';
+import type { AuditTheme, DownloadProgress, DownloadResult, DownloadStatus, FfmpegStatus, UpdateState } from '@/types/electron';
 
 const defaultProgress = (overrides?: Partial<DownloadProgress>): DownloadProgress => ({
     percentage: 0,
@@ -71,6 +71,8 @@ export default function Home() {
     const [showPersonalize, setShowPersonalize] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
     const [showDownloads, setShowDownloads] = useState(false);
+    const [showUpdate, setShowUpdate] = useState(false);
+    const [updateState, setUpdateState] = useState<UpdateState | null>(null);
 
     // Server and client must render the same first paint: reading
     // localStorage in a useState initializer caused a hydration mismatch
@@ -246,6 +248,41 @@ export default function Home() {
     const handleOpenThemesFolder = useCallback(async () => {
         const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
         if (api?.openThemesFolder) await api.openThemesFolder();
+    }, []);
+
+    useEffect(() => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        if (!api?.getUpdateState) return;
+        void api.getUpdateState().then(setUpdateState).catch(() => undefined);
+        api.onUpdateState?.(setUpdateState);
+    }, []);
+
+    useEffect(() => {
+        if (!updateState) return;
+        if (
+            updateState.status === 'available'
+            || updateState.status === 'downloading'
+            || updateState.status === 'ready'
+            || updateState.status === 'error'
+        ) return;
+        setShowUpdate(false);
+    }, [updateState]);
+
+    const handleUpdateDownload = useCallback(async () => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        if (!api?.downloadUpdate) return;
+        setUpdateState(await api.downloadUpdate());
+    }, []);
+
+    const handleUpdateRestart = useCallback(async () => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        if (api?.restartForUpdate) await api.restartForUpdate();
+    }, []);
+
+    const handleUpdateCheck = useCallback(async () => {
+        const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+        if (!api?.checkForUpdates) return;
+        setUpdateState(await api.checkForUpdates());
     }, []);
 
     const handlePickBackground = useCallback(async () => {
@@ -804,6 +841,35 @@ export default function Home() {
 
                 {/* Window Controls - Right Side */}
                 <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} className="flex items-center space-x-4 win98-window-controls">
+                    {updateState && updateState.canAutoUpdate && (
+                        updateState.status === 'available'
+                        || updateState.status === 'downloading'
+                        || updateState.status === 'ready'
+                        || (updateState.status === 'error' && showUpdate)
+                    ) && (
+                        <button
+                            onClick={() => setShowUpdate((open) => !open)}
+                            className={`relative p-1 transition-colors ${updateState.status === 'ready' ? 'acc-text' : 'text-gray-300 acc-hover-text'}`}
+                            title={
+                                updateState.status === 'ready'
+                                    ? `Update ${updateState.availableVersion || ''} ready`
+                                    : updateState.status === 'downloading'
+                                        ? 'Downloading update'
+                                        : updateState.status === 'error'
+                                            ? 'Update error'
+                                            : `Update ${updateState.availableVersion || ''} available`
+                            }
+                        >
+                            {updateState.status === 'downloading'
+                                ? <RefreshCw className="w-4 h-4 animate-spin" />
+                                : updateState.status === 'error'
+                                    ? <AlertTriangle className="w-4 h-4" />
+                                    : <ArrowDownToLine className="w-4 h-4" />}
+                            {updateState.status === 'ready' && (
+                                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            )}
+                        </button>
+                    )}
                     <button
                         onClick={() => window.electronAPI?.windowMinimize?.()}
                         className="p-1 text-gray-300 acc-hover-text transition-colors"
@@ -827,6 +893,109 @@ export default function Home() {
                     </button>
                 </div>
             </div>
+
+            {showUpdate && updateState && (
+                <div
+                    className="absolute top-14 right-2 z-50 w-[300px] max-w-[calc(100vw-1rem)] rounded-2xl glass-popover p-3 flex flex-col gap-2"
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                >
+                    <div className="flex items-center gap-2 px-1 min-w-0">
+                        <span className="w-1.5 h-1.5 rounded-full acc-bg shrink-0" />
+                        <h2 className="text-sm font-semibold text-white">
+                            {updateState.status === 'ready'
+                                ? 'Update ready'
+                                : updateState.status === 'error'
+                                    ? 'Update error'
+                                    : 'Update available'}
+                        </h2>
+                        <button
+                            onClick={() => setShowUpdate(false)}
+                            className="ml-auto p-1 rounded-lg text-gray-500 acc-hover-text transition-colors"
+                            title="Close"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+
+                    {updateState.status === 'available' && (
+                        <>
+                            <div className="px-1 text-[11px] text-gray-300">
+                                Audit {updateState.availableVersion} is available. Nothing is downloaded until you choose it.
+                            </div>
+                            {updateState.releaseNotes && (
+                                <div className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-white/[0.03] p-2 text-[10px] text-gray-400">
+                                    {updateState.releaseNotes}
+                                </div>
+                            )}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleUpdateDownload}
+                                    className="flex-1 px-2 py-1.5 rounded-lg acc-soft-30 acc-text text-[11px] font-medium transition-colors"
+                                >
+                                    Download update
+                                </button>
+                                <button
+                                    onClick={() => setShowUpdate(false)}
+                                    className="px-2 py-1.5 rounded-lg text-[11px] text-gray-400 hover:text-white transition-colors"
+                                >
+                                    Later
+                                </button>
+                            </div>
+                        </>
+                    )}
+
+                    {updateState.status === 'downloading' && (
+                        <div className="flex items-center gap-2 px-1 py-1 text-[11px] text-gray-300">
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin acc-text" />
+                            Downloading update in the background. You can keep using Audit.
+                        </div>
+                    )}
+
+                    {updateState.status === 'ready' && (
+                        <>
+                            <div className="px-1 text-[11px] text-gray-300">
+                                Audit {updateState.availableVersion || ''} has been downloaded. Restart to apply it.
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleUpdateRestart}
+                                    className="flex-1 px-2 py-1.5 rounded-lg acc-soft-30 acc-text text-[11px] font-medium transition-colors"
+                                >
+                                    Restart and install
+                                </button>
+                                <button
+                                    onClick={() => setShowUpdate(false)}
+                                    className="px-2 py-1.5 rounded-lg text-[11px] text-gray-400 hover:text-white transition-colors"
+                                >
+                                    Later
+                                </button>
+                            </div>
+                        </>
+                    )}
+
+                    {updateState.status === 'error' && (
+                        <>
+                            <div className="px-1 text-[11px] text-red-300 break-words">
+                                {updateState.error || 'Update check failed.'}
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleUpdateCheck}
+                                    className="flex-1 px-2 py-1.5 rounded-lg acc-soft-30 acc-text text-[11px] font-medium transition-colors"
+                                >
+                                    Try again
+                                </button>
+                                <button
+                                    onClick={() => setShowUpdate(false)}
+                                    className="px-2 py-1.5 rounded-lg text-[11px] text-gray-400 hover:text-white transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* Global title-bar popovers: style + info live here, not inside tabs */}
             {(showPersonalize || showInfo || showDownloads) && (

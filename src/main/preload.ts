@@ -1,7 +1,7 @@
-﻿// preload.ts
+// preload.ts
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 // Importa i tipi dal file centrale
-import type { DownloadProgress, DownloadOptions, ElectronAPI, LibraryScanResult, TrackArt, MiniCommand, PlayerMiniState, WriteTagFields, WriteTagResult, LibraryCache, LibraryQuery, LibraryQueryResult, LibraryStats, AuditTheme, ThemeImportResult, ThemeBackgroundResult } from '../types/electron.d.ts';
+import type { DownloadProgress, DownloadOptions, ElectronAPI, LibraryScanResult, TrackArt, MiniCommand, PlayerMiniState, WriteTagFields, WriteTagResult, LibraryCache, LibraryQuery, LibraryQueryResult, LibraryStats, AuditTheme, ThemeImportResult, ThemeBackgroundResult, UpdateState } from '../types/electron.d.ts';
 
 // Log che preload script Ã¨ caricato
 console.log('Preload script loaded');
@@ -128,6 +128,22 @@ const electronAPI: ElectronAPI = {
   },
   pickThemeBackground: (): Promise<ThemeBackgroundResult> => {
     return ipcRenderer.invoke('theme:pickBackground');
+  },
+
+  getUpdateState: (): Promise<UpdateState> => {
+    return ipcRenderer.invoke('update:getState');
+  },
+  checkForUpdates: (): Promise<UpdateState> => {
+    return ipcRenderer.invoke('update:check');
+  },
+  downloadUpdate: (): Promise<UpdateState> => {
+    return ipcRenderer.invoke('update:download');
+  },
+  restartForUpdate: (): Promise<boolean> => {
+    return ipcRenderer.invoke('update:restart');
+  },
+  onUpdateState: (cb: (state: UpdateState) => void): void => {
+    ipcRenderer.on('update:state', (_event, state: UpdateState) => cb(state));
   }
 };
 
