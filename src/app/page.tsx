@@ -198,6 +198,21 @@ export default function Home() {
             '--audit-accent-contrast': effectiveAccentContrast,
         } as React.CSSProperties;
 
+    // The main and mini windows share an origin, so the mini player can read
+    // the active theme without sending the (potentially large) wallpaper over
+    // IPC on every state tick.
+    useEffect(() => {
+        try {
+            if (activeTheme) {
+                localStorage.setItem('audit-active-theme', JSON.stringify(activeTheme));
+            } else {
+                localStorage.removeItem('audit-active-theme');
+            }
+        } catch {
+            // theme snapshot is best-effort
+        }
+    }, [activeTheme]);
+
     const handleSelectTheme = useCallback((id: string) => {
         setActiveThemeId(id);
         setThemeMessage(null);

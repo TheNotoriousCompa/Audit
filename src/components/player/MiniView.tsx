@@ -1,7 +1,8 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Maximize2, X, Volume2 } from 'lucide-react';
-import type { PlayerMiniState } from '@/types/electron';
+import type { AuditTheme, PlayerMiniState } from '@/types/electron';
+import { themeClasses, themeStyle } from '@/components/theme';
 import DiskPlaceholder from './DiskPlaceholder';
 
 function fmt(sec: number): string {
@@ -42,6 +43,7 @@ function Marquee({ text, className }: { text: string; className?: string }) {
 // Floating mini player: remote-controls the main window, audio keeps playing there.
 export default function MiniView() {
   const [state, setState] = useState<PlayerMiniState | null>(null);
+  const [theme, setTheme] = useState<AuditTheme | null>(null);
   const barRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -54,6 +56,23 @@ export default function MiniView() {
         return s;
       });
     });
+  }, []);
+
+  useEffect(() => {
+    const read = () => {
+      try {
+        const raw = localStorage.getItem('audit-active-theme');
+        setTheme(raw ? (JSON.parse(raw) as AuditTheme) : null);
+      } catch {
+        setTheme(null);
+      }
+    };
+    read();
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'audit-active-theme' || event.key === null) read();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
@@ -82,12 +101,17 @@ export default function MiniView() {
 
   return (
     <div
-      className="w-screen h-screen flex flex-col select-none overflow-hidden rounded-xl border border-white/10 text-gray-100"
+      data-audit-theme={theme?.id}
+      className={`w-screen h-screen flex flex-col select-none overflow-hidden rounded-xl border border-white/10 text-gray-100 mini-window ${theme ? themeClasses(theme) : ''}`}
       style={{
+        ...(theme ? themeStyle(theme) : {}),
         WebkitAppRegion: 'drag',
-        backgroundColor: 'rgba(14, 14, 17, 0.94)',
-        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.55)',
-        '--audit-accent': state?.accent || '#ffffff',
+        ...(theme ? {} : {
+          backgroundColor: 'rgba(14, 14, 17, 0.94)',
+          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.55)',
+        }),
+        '--audit-accent': theme?.tokens.accent || state?.accent || '#ffffff',
+        ...(theme?.tokens.radius === 0 ? { borderRadius: 0 } : {}),
       } as React.CSSProperties}
     >
       {/* Artwork + title + window actions */}
