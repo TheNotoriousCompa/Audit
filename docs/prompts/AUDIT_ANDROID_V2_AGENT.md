@@ -437,6 +437,47 @@ Keywords: **calm, tactile, deep, precise, album-first, uncluttered**.
 - Fallback on unsupported devices: opaque elevated surface, not a washed-out transparent box.
 - Haze performance: measure release build; degrade glass on low-end devices if needed.
 
+### 6.3.1 Reference patterns from CSS liquid-glass demos
+
+Use the visual ideas from CSS liquid-glass galleries, but **do not paste CSS/SVG filters into Android**.
+Browser snippets rely on `backdrop-filter`, `filter: contrast()`, SVG `feDisplacementMap`, and
+pseudo-elements; Android has no CSS compositor. Translate them like this:
+
+| CSS demo pattern | Android/Compose translation |
+|---|---|
+| `backdrop-filter: blur()` | Haze 2 `hazeBlur` / `hazeGlass` with `HazeInput.Sources`; real captured backdrop |
+| SVG `feDisplacementMap` / chromatic RGB split | Haze Glass refraction, or a custom AGSL `RuntimeShader`; optional dispersion/chromatic aberration |
+| `filter: contrast(3)` lens punch | Do **not** apply a global contrast filter; increase specular/edge contrast inside the glass shader and keep text contrast |
+| 6-layer inset `box-shadow` bevels | Compose `drawWithContent`/`drawBehind` with multiple inset strokes, top-left highlight, bottom-right shade |
+| `:before` / `:after` blurred rim glare | Separate `Canvas` layers/draw passes with low-alpha gradients; clip to the shape |
+| conic-gradient rim + `mask-composite` | `Brush.sweepGradient` + `clipPath`/`BlendMode` or AGSL; animate the angle with `animateFloat` |
+| 3D press (`rotate3d`) | `Modifier.graphicsLayer { rotationX = ...; scaleX/Y = ... }` + spring; keep it subtle |
+| `contain: strict` / paint isolation | Clip each glass surface, avoid invalidating the whole screen, keep blur layers small |
+| noise overlay | 2–3% tiled noise drawable above the glass fill, below content |
+
+Concrete component targets:
+
+- **Glass action button** (download, play, “Add folder”): pill/28dp radius, Haze glass, conic/sweep
+  rim highlight, inner top specular line, 2–3% noise, press scale 0.97 + light haptic, no global
+  contrast hack. Text must keep 4.5:1 contrast.
+- **Glass bottom nav / mini player**: source-backed blur of the scrolling content, 1px top highlight,
+  soft shadow, opaque-enough tint for icons/labels.
+- **Glass Now Playing dock**: strongest glass effect; limit to the control dock, not the whole screen.
+- **Glass sheets**: glass header/handle, solid content surface; do not blur long lists.
+- **Cover picker cards**: solid dark cards with a thin glass selection ring; not 12 blurred thumbnails.
+
+Reject any implementation that:
+- only changes `backgroundColor` alpha;
+- blurs a static image instead of the live content behind the surface;
+- applies blur to every list row;
+- hides text contrast problems behind a gradient;
+- uses `filter: contrast()`-style global effects that distort the entire app.
+
+For React Native, the closest prebuilt mapping is `@uginy/react-native-liquid-glass` (AGSL on Android
+13+, real refraction/chromatic aberration/glare/edge glow/noise) plus `react-native-saf-x` for SAF.
+For Compose, use Haze 2 `haze-glass`; add a custom AGSL shader only for a specific hero/button effect.
+Do not mix both stacks in the same app.
+
 ### 6.4 Motion
 
 - 200–300ms, spring; Now Playing morph from mini player; album art parallax; sheet slide.
