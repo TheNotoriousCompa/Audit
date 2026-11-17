@@ -4,25 +4,25 @@ These are self-contained briefs for agents working in parallel on the next produ
 
 | Brief | Use it for | Workspace |
 |---|---|---|
-| [`AUDIT_ANDROID_V2_AGENT.md`](./AUDIT_ANDROID_V2_AGENT.md) | Standalone Android app: yt-dlp downloads, local folder scanning, library/player/EQ, real Haze liquid glass | New `feat/android-v2` branch/worktree from `dev` |
+| [`AUDIT_ANDROID_RN_AGENT.md`](./AUDIT_ANDROID_RN_AGENT.md) | **Chosen build.** Expo/React Native UI + local Kotlin Expo module for yt-dlp downloads, SAF scanning, tags/covers, playback/EQ; real liquid glass | New `feat/android-rn` branch/worktree from `dev`, app in `mobile/` |
+| [`AUDIT_ANDROID_V2_AGENT.md`](./AUDIT_ANDROID_V2_AGENT.md) | Native Compose alternative only. Do **not** combine it with the RN brief | New `feat/android-v2` branch/worktree |
 | [`AUDIT_SHOWCASE_WEB_AGENT.md`](./AUDIT_SHOWCASE_WEB_AGENT.md) | Public Next.js showcase/marketing site for desktop + Android | **Separate repository**, e.g. `audit-site` |
 
-> The previous Expo/React Native + desktop-sync brief was removed intentionally.
-> This product is **standalone**: no pairing, no LAN server, no cloud, no desktop dependency.
+> The old Expo + desktop-sync brief was removed intentionally.
+> The product is **standalone**: no pairing, no LAN server, no cloud, no desktop dependency.
 
-## Copy-paste starter
-
-For the Android agent:
+## Copy-paste starter — chosen RN build
 
 ```text
-Read docs/prompts/AUDIT_ANDROID_V2_AGENT.md end to end, then read the repository files it lists.
-Work autonomously in a new feat/android-v2 worktree. The old Expo/desktop-sync plan is cancelled:
-remove it, do not adapt it. Start with Phase 0 and prove yt-dlp download, SAF folder scan, real Haze
-glass and background playback + EQ with spikes before building the full UI. Implement the entire v1
-scope, run the release-gate demo, and report evidence. Do not stop at scaffolding.
+Read docs/prompts/AUDIT_ANDROID_RN_AGENT.md end to end, then read the repository files it lists.
+Work autonomously in a new feat/android-rn worktree. Do not reuse the old Expo/sync attempt or the
+pure-Compose brief. Build an Expo/React Native app with a local Kotlin Expo module (modules/audit-core)
+for yt-dlp + FFmpeg downloads, SAF scanning, tag/covers and playback/EQ. Use @uginy/react-native-liquid-glass.
+Start with Phase 0 and prove the four spikes on a real Android device before building the full UI.
+Implement the entire v1 scope, run the release-gate demo, and report evidence. Do not stop at scaffolding.
 ```
 
-For the website agent:
+## Copy-paste starter — website
 
 ```text
 Read docs/prompts/AUDIT_SHOWCASE_WEB_AGENT.md end to end. Build the separate Next.js showcase site
@@ -33,11 +33,11 @@ and run the acceptance checklist.
 
 ## Recommended order
 
-1. Run the Android brief first. It defines the real constraints and the release risks.
+1. Run the RN/Android brief first. It defines the real constraints and the release risks.
 2. Run the website brief in parallel, but keep Android in “coming soon” state until the APK/F-Droid
    build exists.
 3. Do not publish an Android build, store listing, or public “available now” claim until the release
-   gate in the Android brief is met.
+   gate in the RN brief is met.
 
 ## Before handing a brief to an agent
 
@@ -45,14 +45,14 @@ and run the acceptance checklist.
 - Tell it to work in a dedicated branch/worktree and not to touch unrelated desktop behavior.
 - Require a short plan and a risk list before implementation.
 - Require evidence: lint/tests, real-device screenshots, and the end-to-end demo script.
-- For the Android brief, resolve the license strategy and the four Phase 0 spikes before the UI.
+- For the RN brief, resolve the license strategy and the four Phase 0 spikes before the UI.
 
 ## Non-negotiable product rules
 
 - Standalone Android app: no desktop pairing, no LAN server, no accounts, no cloud library.
 - Downloads run on the phone through yt-dlp; no PC/desktop dependency.
 - Real folder scanning via SAF; no “import one file at a time” UX.
-- Real Haze glass with backdrop sampling; no translucent-card fake glass.
+- Real liquid glass with live backdrop blur/refraction; no translucent-card fake glass.
 - Covers visible everywhere; context-menu “Find cover” is a first-class action.
 - No Spotify/Poweramp/Seal assets, fonts, code, or branding. Architecture/behavior inspiration only.
 - Resolve the GPL/license strategy before shipping the download engine.

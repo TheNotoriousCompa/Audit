@@ -1,5 +1,10 @@
 # Audit Android v2 — Standalone Music App + Downloader
 
+> **ALTERNATIVE ONLY — NOT THE CHOSEN BUILD.**
+> The chosen build is `AUDIT_ANDROID_RN_AGENT.md` (Expo/React Native UI + local Kotlin module).
+> Use this pure-Compose brief only if the user explicitly abandons React Native. Do not combine
+> the two briefs in one implementation.
+>
 > **This brief supersedes `AUDIT_MOBILE_V1_AGENT.md` and every previous Expo/React Native/desktop-sync plan.**
 > Do not reuse the old mobile branch, the old sync contract, or the old pairing UI.
 > The app must be **standalone**. It must not connect to Audit Desktop, a LAN server, a cloud account,
