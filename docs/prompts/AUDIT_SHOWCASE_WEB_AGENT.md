@@ -10,14 +10,14 @@
 ## 1. Mission
 
 Build a launch-ready public website for **Audit**, the local-first YouTube-to-MP3 downloader and
-music player for Windows, and its upcoming **Audit Mobile** app for iOS and Android.
+music player for Windows, and its upcoming **standalone Android app**.
 
 The site must:
 
 - explain the product in under 30 seconds;
 - make the download action obvious and trustworthy;
-- showcase the desktop app and the Liquid Glass mobile design with real screenshots;
-- explain local-first privacy, the theme system, and desktop↔mobile sync;
+- showcase the desktop app and the Liquid Glass Android design with real screenshots;
+- explain local-first privacy, the theme system, autonomous Android downloads and folder scanning;
 - be fast, accessible, responsive and easy to update for releases;
 - look like a premium audio product, not a generic SaaS template.
 
@@ -49,24 +49,26 @@ Features to present:
    import/export. No theme network fetch.
 5. **User-controlled updates** — background availability check, visible notification, no download
    until the user chooses, no install until “Restart and install”.
-6. **Mobile (coming)** — Expo app for iOS/Android, Liquid Glass design, local playback, EQ,
-   playlists, themes, optional pairing with the desktop for library sync and download delegation.
+6. **Android (coming)** — standalone Android app, real Liquid Glass UI, local playback, EQ,
+   playlists, autonomous yt-dlp downloads and SAF folder scanning. No PC, no pairing, no account.
 
-### Audit Mobile v1 (for launch messaging)
+### Audit Android v1 (for launch messaging)
 
-- iOS + Android, one coordinated release.
-- Local-first playback and library; phone imports supported.
-- Desktop pairing over LAN/QR; library sync; downloads delegated to the PC’s yt-dlp/FFmpeg engine.
-- No cloud account, no hosted backend in v1.
-- Liquid Glass design, Spotify-like structure but original branding.
-- Do not announce a release date unless the user provides one. Use “Coming soon” / “In development”
-  until store links exist.
+- Android only; no iOS promise for this release.
+- Standalone: downloads run on the phone via yt-dlp; no desktop, no LAN server, no pairing.
+- Scan a phone music folder with SAF; covers and metadata appear in the library automatically.
+- Local playback, background audio, EQ, playlists, tag editor, cover lookup from the context menu.
+- No cloud account, no hosted backend, no upload of the music library.
+- Liquid Glass design, Spotify/Airbnb-like structure but original branding.
+- Distribution may be GitHub/F-Droid first; Google Play is not guaranteed because of direct-download
+  policy. Do not announce a release date or store link unless the user provides one. Use
+  “Coming soon” / “In development” until an APK/F-Droid link exists.
 
 ### Brand facts
 
 - Logo asset: `Public/AUDIT.png` in the desktop repo (white A + waveform on black rounded square).
 - The wordmark is “Audit”.
-- Desktop default look is dark and monochrome with a user-selectable accent; mobile v1 uses
+- Desktop default look is dark and monochrome with a user-selectable accent; Android v1 uses
   **Audit Lime `#B8FF3C`** as its signature accent.
 - Do not use Spotify’s logo, wordmark, proprietary fonts, exact green `#1ED760`, screenshots, or
   any implication of affiliation with Spotify or YouTube.
@@ -146,7 +148,7 @@ nav, and selected panels. Editorial sections can be flat dark with strong typogr
 - Generous vertical rhythm; editorial sections alternate copy and product visuals.
 - Hero: asymmetric two-column on desktop; stacked on mobile. Left: wordmark, headline, subcopy,
   CTAs, small trust line. Right: layered glass device mockup with real app screenshot(s).
-- Sticky top nav: glass, thin, with logo, Features, Themes, Mobile, Download, GitHub.
+- Sticky top nav: glass, thin, with logo, Features, Themes, Android, Download, GitHub.
 - Persistent bottom CTA on mobile? Avoid intrusive bars; use a single sticky “Download” only on the
   download page if needed.
 - Footer: product, resources, legal, GitHub, release version, “Made for local music”.
@@ -163,9 +165,9 @@ nav, and selected panels. Editorial sections can be flat dark with strong typogr
 
 ### 4.6 Imagery
 
-- Use real screenshots of the desktop app and mobile app. Do not fabricate UI in HTML that looks
+- Use real screenshots of the desktop app and Android app. Do not fabricate UI in HTML that looks
   like a screenshot unless it is clearly a stylized illustration.
-- Until final mobile screenshots exist, use a labeled placeholder frame or a design mock clearly
+- Until final Android screenshots exist, use a labeled placeholder frame or a design mock clearly
   marked “Preview”; do not present it as shipped.
 - Use the actual `AUDIT.png` logo. Do not recolor it into a Spotify-like mark.
 - Theme gallery images: Default, Pixel, Retro 98, Vista Aero; use real captures.
@@ -182,7 +184,7 @@ nav, and selected panels. Editorial sections can be flat dark with strong typogr
 /                     Home / product showcase
 /features             Detailed feature breakdown (optional if home is enough)
 /themes               Theme gallery + offline theme format
-/mobile               Audit Mobile preview, sync, download delegation
+/android              Standalone Android preview, downloads, folder scanning, glass
 /download             Windows installer, portable ZIP, requirements, SmartScreen note
 /changelog            Releases, grouped by version
 /docs                 Getting started, FAQ, troubleshooting (MDX)
@@ -202,7 +204,7 @@ Suggested copy (refine, don’t inflate):
 - Sub: “Audit downloads from YouTube, keeps your library on your PC, and plays it beautifully.
   No account. No cloud locker. No surprises.”
 - Primary CTA: **Download for Windows**
-- Secondary CTA: **See the mobile app** (links to `/mobile`)
+- Secondary CTA: **See the Android app** (links to `/android`)
 - Trust line: “Free · Local-first · v1.5.1 · Windows 10/11”
 
 Sections:
@@ -213,12 +215,12 @@ Sections:
 3. **Library that stays yours** — multi-folder scan, search, genres/artists/albums, no upload.
 4. **A player, not a webpage** — queue, shuffle, repeat, mini player, 10-band EQ, tag editor.
 5. **Themes that change the room** — horizontal gallery with 4 real screenshots; link to `/themes`.
-6. **Mobile, without the cloud** — phone + PC pairing diagram; library sync; downloads delegated;
-   “your files stay on your hardware”.
+6. **Android, without the cloud** — standalone phone app; autonomous yt-dlp downloads; SAF folder
+   scanning; real liquid glass; “your files stay on your phone”.
 7. **Privacy by architecture** — three concrete claims, not vague “we care” copy:
    local files, no account, no telemetry by default.
 8. **User-controlled updates** — check, notify, download only on consent, install only on action.
-9. **Final CTA** — download + mobile preview + GitHub.
+9. **Final CTA** — download + Android preview + GitHub.
 
 Avoid fake testimonials, fake user counts, fake “trusted by” logos, and invented awards.
 
@@ -234,23 +236,23 @@ Avoid fake testimonials, fake user counts, fake “trusted by” logos, and inve
   supplied wallpaper; verify rights before redistributing it from the public site. If unclear,
   show the UI with a neutral background and mention the wallpaper is user-supplied.
 
-### 5.3 `/mobile`
+### 5.3 `/android` (keep `/mobile` as a redirect or alias only if needed)
 
-- Positioning: “The same library. In your pocket. Still yours.”
-- Hero mockup: Now Playing + Library screens, glass treatment.
-- Feature grid: local playback, offline library, EQ, playlists, themes, background audio.
-- **Sync section** with a simple diagram:
-  `Phone ↔ local Wi-Fi ↔ Audit Desktop → yt-dlp/FFmpeg → library`.
-- Explain v1 honestly:
-  - phone plays local/imported and cached tracks;
-  - downloads are requested from the paired desktop;
-  - no cloud account, no remote access in v1;
-  - iOS/Android store links appear when available.
-- “Coming soon” state: disabled store badges, optional “Notify me” link only if a real list exists.
-  Do not use a fake email form with no backend.
-- FAQ: Does it work without a PC? (local playback yes, downloads no); Does it upload my music? (no);
-  Can I use it outside my home network? (not in v1); Which formats? (same as desktop, subject to
-  platform support).
+- Positioning: “Your music. On your phone. Still yours.”
+- Hero mockup: Now Playing + Library + Folders screens, real liquid glass treatment.
+- Feature grid: autonomous yt-dlp downloads, SAF folder scanning, covers/metadata, local playback,
+  background audio, EQ, playlists, tag editor, context-menu cover lookup.
+- **No sync diagram.** Explain v1 honestly:
+  - the app is standalone; it does not connect to Audit Desktop;
+  - downloads run on the phone; a PC is not required;
+  - the user picks a music folder and the app scans it recursively, including covers;
+  - no cloud account, no server, no upload of the library;
+  - Android APK/F-Droid/GitHub links appear when available; Google Play is not guaranteed.
+- “Coming soon” state: disabled download/store badges, optional “Notify me” link only if a real list
+  exists. Do not use a fake email form with no backend.
+- FAQ: Does it work without a PC? (yes); Does it upload my music? (no); Can it scan my whole music
+  folder? (yes, via Android SAF); Does it download directly? (yes, via yt-dlp on the phone);
+  Which formats? (same family as desktop, subject to Android/FFmpeg support).
 
 ### 5.4 `/download`
 
@@ -273,14 +275,14 @@ Avoid fake testimonials, fake user counts, fake “trusted by” logos, and inve
 ### 5.6 `/docs` and FAQ
 
 - Install, first download, library folders, themes, updates, troubleshooting (SmartScreen, FFmpeg,
-  no audio), mobile pairing (when available), privacy.
+  no audio), Android folder scanning and downloads (when available), privacy.
 - Keep answers short and task-oriented; link to the desktop docs.
 - Search is optional; do not add a heavy docs framework for six pages.
 
 ### 5.7 `/privacy`
 
 - Plain-language policy: what is processed locally, what network calls exist (YouTube via yt-dlp,
-  GitHub update check, optional mobile LAN sync), what is not collected.
+  GitHub update check, Android direct downloads/optional cover lookup), what is not collected.
 - No account, no analytics by default, no sale of data.
 - Contact method (GitHub issues or a real email).
 - This is a product policy, not legal advice; mark placeholders for the user to review.
@@ -336,7 +338,7 @@ Avoid fake testimonials, fake user counts, fake “trusted by” logos, and inve
 
 - Confirm current version, release URL, installer size, supported OS.
 - Collect real desktop screenshots (Default, Pixel, Retro 98, Vista Aero, player, library, downloader).
-- Collect mobile design frames; label as preview until shipped.
+- Collect Android design frames; label as preview until shipped.
 - Write the final copy in `content/` with a single source of truth for release data.
 - Confirm wallpaper licensing for public theme screenshots.
 
@@ -348,7 +350,7 @@ Avoid fake testimonials, fake user counts, fake “trusted by” logos, and inve
 
 ### Phase 2 — Pages
 
-- Home, Themes, Mobile, Download, Changelog, Docs/FAQ, Privacy, 404.
+- Home, Themes, Android, Download, Changelog, Docs/FAQ, Privacy, 404.
 - Real links to GitHub releases; external link handling.
 - Mobile “coming soon” states.
 
@@ -366,7 +368,7 @@ Avoid fake testimonials, fake user counts, fake “trusted by” logos, and inve
 - A first-time visitor understands what Audit does and how to download it within one screen.
 - The Windows download CTA points to the actual latest release asset; portable ZIP is clearly
   distinguished; SmartScreen is explained.
-- Mobile is presented as upcoming unless store links exist; download buttons are not fake.
+- Android is presented as upcoming unless store links exist; download buttons are not fake.
 - All screenshots are real or clearly labeled previews; no invented UI.
 - The site looks intentional at 360px, 768px, 1024px and 1440px; no horizontal scroll.
 - Lighthouse ≥ 95 performance/accessibility/best-practices/SEO in a production build.
@@ -409,7 +411,7 @@ Desktop (≥ 1024px):
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│  [A] Audit        Features  Themes  Mobile  Download  GitHub  │
+│  [A] Audit        Features  Themes  Android  Download  GitHub  │
 │                                                              │
 │  LOCAL-FIRST MUSIC                    ┌───────────────────┐  │
 │  Your music.                         │  glass desktop    │  │
@@ -420,7 +422,7 @@ Desktop (≥ 1024px):
 │  keeps your library on your PC,                             │
 │  and plays it beautifully.                                  │
 │                                                              │
-│  [ Download for Windows ]  [ Meet Audit Mobile → ]           │
+│  [ Download for Windows ]  [ Meet Audit Android → ]           │
 │  Free · Local-first · v1.5.1 · Windows 10/11                 │
 └──────────────────────────────────────────────────────────────┘
 ```
